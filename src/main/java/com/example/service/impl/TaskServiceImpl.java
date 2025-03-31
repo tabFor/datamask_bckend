@@ -10,6 +10,8 @@ import com.example.service.TaskService;
 import com.example.utils.RedisUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -37,6 +39,8 @@ public class TaskServiceImpl implements TaskService {
     private static final String TASK_LIST_CACHE_KEY_PREFIX = "task:list:";
     private static final long CACHE_EXPIRE_HOURS = 1;
     private static final String MASKED_TABLE_PREFIX = "masked_";
+
+    private static final Logger logger = LoggerFactory.getLogger(TaskServiceImpl.class);
 
     @Autowired
     private TaskRepository taskRepository;
@@ -230,7 +234,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public Task executeTask(Long id) {
-        System.out.println("开始执行任务, 任务ID: " + id);
+        logger.info("开始执行任务, 任务ID: {}", id);
         Task task = findTaskById(id);
         
         // 检查任务状态
@@ -239,7 +243,7 @@ public class TaskServiceImpl implements TaskService {
         }
         
         if (!"等待中".equals(task.getStatus())) {
-            System.out.println("任务状态不允许执行, 任务ID: " + id + ", 当前状态: " + task.getStatus());
+            logger.warn("任务状态不允许执行, 任务ID: {}, 当前状态: {}", id, task.getStatus());
             throw new RuntimeException("任务状态不允许执行");
         }
         
@@ -255,12 +259,11 @@ public class TaskServiceImpl implements TaskService {
         
         // 直接执行脱敏任务
         try {
-            System.out.println("开始执行脱敏任务, 任务ID: " + savedTask.getId());
+            logger.info("开始执行脱敏任务, 任务ID: {}", savedTask.getId());
             executeMaskingTask(savedTask);
             return savedTask;
         } catch (Exception e) {
-            System.err.println("脱敏任务执行异常, 任务ID: " + savedTask.getId() + ", 错误信息: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("脱敏任务执行异常, 任务ID: {}, 错误信息: {}", savedTask.getId(), e.getMessage(), e);
             handleTaskException(savedTask.getId(), e);
             throw e;
         }
@@ -354,12 +357,12 @@ public class TaskServiceImpl implements TaskService {
     // 执行脱敏任务
     private void executeMaskingTask(Task task) {
         try {
-            System.out.println("执行脱敏任务, 任务ID: " + task.getId() + ", 任务名称: " + task.getTaskName());
+            logger.info("执行脱敏任务, 任务ID: {}, 任务名称: {}", task.getId(), task.getTaskName());
             
             // 获取任务的脱敏规则
             String maskingRulesJson = task.getMaskingRules();
             if (maskingRulesJson == null || maskingRulesJson.isEmpty()) {
-                System.out.println("任务脱敏规则为空, 任务ID: " + task.getId());
+                logger.warn("任务脱敏规则为空, 任务ID: {}", task.getId());
                 throw new RuntimeException("任务脱敏规则为空");
             }
             
@@ -370,13 +373,13 @@ public class TaskServiceImpl implements TaskService {
             if (columnMappingsJson != null && !columnMappingsJson.isEmpty()) {
                 try {
                     columnToRuleMap = objectMapper.readValue(columnMappingsJson, new TypeReference<Map<String, String>>() {});
-                    System.out.println("成功解析列名映射: " + columnToRuleMap);
+                    logger.debug("成功解析列名映射: {}", columnToRuleMap);
                 } catch (Exception e) {
-                    System.err.println("解析列名映射失败: " + e.getMessage());
+                    logger.warn("解析列名映射失败: {}", e.getMessage());
                     // 解析失败不影响后续处理，使用空映射继续
                 }
             } else {
-                System.out.println("列名映射为空，将使用规则中的列名");
+                logger.debug("列名映射为空，将使用规则中的列名");
             }
             
             // 解析脱敏规则
@@ -385,40 +388,40 @@ public class TaskServiceImpl implements TaskService {
                 // 首先尝试解析为规则ID列表(字符串数组)
                 try {
                     ruleIds = objectMapper.readValue(maskingRulesJson, new TypeReference<List<String>>() {});
-                    System.out.println("解析为规则ID列表，ID数量: " + ruleIds.size());
+                    logger.debug("解析为规则ID列表，ID数量: {}", ruleIds.size());
                     
                     // 添加详细输出 - 打印每个规则ID
-                    System.out.println("======== 规则ID详情 ========");
+                    logger.debug("======== 规则ID详情 ========");
                     for (int i = 0; i < ruleIds.size(); i++) {
-                        System.out.println("规则ID[" + i + "]: '" + ruleIds.get(i) + "'");
+                        logger.debug("规则ID[{}]': {}", i, ruleIds.get(i));
                     }
-                    System.out.println("==========================");
+                    logger.debug("==========================");
                 } catch (Exception e) {
                     // 如果解析为ID列表失败，尝试解析为MaskingRuleDTO列表
-                    System.out.println("尝试解析为MaskingRuleDTO列表...");
-                    System.out.println("解析失败原因: " + e.getMessage());
-                    System.out.println("原始JSON字符串: " + maskingRulesJson);
+                    logger.debug("尝试解析为MaskingRuleDTO列表...");
+                    logger.debug("解析失败原因: {}", e.getMessage());
+                    logger.debug("原始JSON字符串: {}", maskingRulesJson);
                     
                     List<MaskingRuleDTO> ruleDTOs = objectMapper.readValue(maskingRulesJson, new TypeReference<List<MaskingRuleDTO>>() {});
                     
                     // 确保所有规则都是激活状态
                     for (MaskingRuleDTO dto : ruleDTOs) {
                         dto.setActive(true);
-                        System.out.println("设置规则为激活状态: " + dto.getRuleId() + ", 激活状态: " + dto.isActive());
+                        logger.debug("设置规则为激活状态: {}, 激活状态: {}", dto.getRuleId(), dto.isActive());
                     }
                     
                     // 添加详细输出 - 打印解析出的DTO对象
-                    System.out.println("======== 解析出的MaskingRuleDTO详情 ========");
+                    logger.debug("======== 解析出的MaskingRuleDTO详情 ========");
                     for (int i = 0; i < ruleDTOs.size(); i++) {
                         MaskingRuleDTO dto = ruleDTOs.get(i);
-                        System.out.println("规则DTO[" + i + "]: " + dto);
-                        System.out.println("  - RuleId: '" + dto.getRuleId() + "'");
-                        System.out.println("  - 类型: " + dto.getMaskingType());
-                        System.out.println("  - 列名: " + dto.getColumnName());
-                        System.out.println("  - 数据库: " + dto.getDatabase());
-                        System.out.println("  - 表名: " + dto.getTableName());
+                        logger.debug("规则DTO[{}] {}", i, dto);
+                        logger.debug("  - RuleId: '{}'", dto.getRuleId());
+                        logger.debug("  - 类型: {}", dto.getMaskingType());
+                        logger.debug("  - 列名: {}", dto.getColumnName());
+                        logger.debug("  - 数据库: {}", dto.getDatabase());
+                        logger.debug("  - 表名: {}", dto.getTableName());
                     }
-                    System.out.println("=======================================");
+                    logger.debug("=======================================");
                     
                     // 提取ruleId属性组成ruleIds列表
                     ruleIds = ruleDTOs.stream()
@@ -426,14 +429,14 @@ public class TaskServiceImpl implements TaskService {
                             .filter(id -> id != null && !id.isEmpty())
                             .collect(Collectors.toList());
                     
-                    System.out.println("从MaskingRuleDTO列表中提取规则ID，ID数量: " + ruleIds.size());
+                    logger.debug("从MaskingRuleDTO列表中提取规则ID，ID数量: {}", ruleIds.size());
                     
                     // 添加详细输出 - 打印提取的规则ID
-                    System.out.println("======== 提取的规则ID详情 ========");
+                    logger.debug("======== 提取的规则ID详情 ========");
                     for (int i = 0; i < ruleIds.size(); i++) {
-                        System.out.println("提取规则ID[" + i + "]: '" + ruleIds.get(i) + "'");
+                        logger.debug("提取规则ID[{}]': {}", i, ruleIds.get(i));
                     }
-                    System.out.println("================================");
+                    logger.debug("================================");
                     
                     // 如果没有有效的ruleId，则抛出异常
                     if (ruleIds.isEmpty()) {
@@ -441,20 +444,20 @@ public class TaskServiceImpl implements TaskService {
                     }
                 }
             } catch (Exception e) {
-                System.err.println("解析脱敏规则失败: " + e.getMessage());
+                logger.error("解析脱敏规则失败: {}", e.getMessage());
                 e.printStackTrace();
                 throw new RuntimeException("无法解析脱敏规则", e);
             }
             
             // 通过StaticDataMaskingService获取规则
-            System.out.println("开始通过StaticDataMaskingService获取规则，规则ID数量: " + ruleIds.size());
+            logger.debug("开始通过StaticDataMaskingService获取规则，规则ID数量: {}", ruleIds.size());
             List<Map<String, Object>> maskingRules = staticDataMaskingService.getRulesByIds(ruleIds);
             
-            System.out.println("脱敏配置解析完成, 规则数量: " + maskingRules.size());
+            logger.debug("脱敏配置解析完成, 规则数量: {}", maskingRules.size());
             
             // 如果有列名映射，则需要修改规则中的列名
             if (!columnToRuleMap.isEmpty() && !maskingRules.isEmpty()) {
-                System.out.println("====== 应用列名映射 ======");
+                logger.debug("====== 应用列名映射 ======");
                 
                 // 创建规则ID到规则对象的映射，方便后续查找
                 Map<String, Map<String, Object>> ruleIdToRuleMap = new HashMap<>();
@@ -471,7 +474,7 @@ public class TaskServiceImpl implements TaskService {
                     String columnName = entry.getKey();      // 数据表的列名
                     String ruleId = entry.getValue();        // 对应的规则ID
                     
-                    System.out.println("映射列名: " + columnName + " -> 规则ID: " + ruleId);
+                    logger.debug("映射列名: {} -> 规则ID: {}", columnName, ruleId);
                     
                     // 从规则映射中获取对应的规则
                     Map<String, Object> rule = ruleIdToRuleMap.get(ruleId);
@@ -482,40 +485,40 @@ public class TaskServiceImpl implements TaskService {
                         // 设置正确的列名
                         mappedRule.put("columnName", columnName);
                         
-                        System.out.println("创建映射规则: 列名=" + columnName + ", 规则类型=" + mappedRule.get("type"));
+                        logger.debug("创建映射规则: 列名={}, 规则类型={}", columnName, mappedRule.get("type"));
                         mappedRules.add(mappedRule);
                     } else {
-                        System.out.println("警告: 找不到规则ID: " + ruleId);
+                        logger.warn("警告: 找不到规则ID: {}", ruleId);
                     }
                 }
                 
                 // 如果成功创建了映射规则，则使用映射规则替换原始规则
                 if (!mappedRules.isEmpty()) {
-                    System.out.println("使用映射后的规则: " + mappedRules.size() + "条");
+                    logger.debug("使用映射后的规则: {}条", mappedRules.size());
                     maskingRules = mappedRules;
                 } else {
-                    System.out.println("未创建任何映射规则，将使用原始规则");
+                    logger.debug("未创建任何映射规则，将使用原始规则");
                 }
                 
-                System.out.println("===========================");
+                logger.debug("===========================");
             }
             
             // 添加调试信息，检查最终用于处理的规则
             if (maskingRules.isEmpty()) {
-                System.out.println("警告: 没有找到任何匹配的脱敏规则，将不会进行数据脱敏处理!");
+                logger.warn("没有找到任何匹配的脱敏规则，将不会进行数据脱敏处理!");
             } else {
-                System.out.println("======== 最终使用的脱敏规则详情 ========");
+                logger.debug("======== 最终使用的脱敏规则详情 ========");
                 for (int i = 0; i < maskingRules.size(); i++) {
                     Map<String, Object> rule = maskingRules.get(i);
-                    System.out.println("规则[" + i + "]: " + rule);
-                    System.out.println("  - id: " + rule.get("id"));
-                    System.out.println("  - ruleId: " + rule.get("ruleId"));
-                    System.out.println("  - name: " + rule.get("name"));
-                    System.out.println("  - type: " + rule.get("type"));
-                    System.out.println("  - pattern: " + rule.get("pattern"));
-                    System.out.println("  - 列名: " + staticDataMaskingService.extractColumnName(rule));
+                    logger.debug("规则[{}]: {}", i, rule);
+                    logger.debug("  - id: {}", rule.get("id"));
+                    logger.debug("  - ruleId: {}", rule.get("ruleId"));
+                    logger.debug("  - name: {}", rule.get("name"));
+                    logger.debug("  - type: {}", rule.get("type"));
+                    logger.debug("  - pattern: {}", rule.get("pattern"));
+                    logger.debug("  - 列名: {}", staticDataMaskingService.extractColumnName(rule));
                 }
-                System.out.println("=======================================");
+                logger.debug("=======================================");
             }
             
             // 获取输出配置
@@ -527,14 +530,15 @@ public class TaskServiceImpl implements TaskService {
             String outputLocation = task.getOutputLocation();
             String outputTable = task.getOutputTable();
             
-            System.out.println("输出配置: 格式=" + outputFormat + ", 位置=" + 
+            logger.debug("输出配置: 格式={}, 位置={}", 
+                outputFormat, 
                 (outputFormat.equalsIgnoreCase("CSV") || outputFormat.equalsIgnoreCase("JSON") ? 
                 outputLocation : outputTable));
             
             // 解析数据源信息
             String sourceDatabase = task.getSourceDatabase();
             String sourceTables = task.getSourceTables();
-            System.out.println("数据源信息: 数据库=" + sourceDatabase + ", 表=" + sourceTables);
+            logger.debug("数据源信息: 数据库={}, 表={}", sourceDatabase, sourceTables);
             
             // 记录开始处理
             task.setExecutionLog("开始执行脱敏任务，处理表: " + sourceTables);
@@ -544,9 +548,9 @@ public class TaskServiceImpl implements TaskService {
             List<Map<String, Object>> originalData = staticDataMaskingService.queryOriginalData(sourceDatabase, sourceTables);
             
             // 使用静态脱敏服务处理数据
-            System.out.println("获取脱敏处理后的数据...");
+            logger.debug("获取脱敏处理后的数据...");
             List<Map<String, Object>> maskedData = staticDataMaskingService.processMaskedData(originalData, maskingRules);
-            System.out.println("成功获取脱敏后数据, 共 " + maskedData.size() + " 条记录");
+            logger.debug("成功获取脱敏后数据, 共 {} 条记录", maskedData.size());
             
             task.setExecutionLog(task.getExecutionLog() + "\n脱敏处理完成，准备输出数据");
             taskRepository.save(task);
@@ -554,7 +558,7 @@ public class TaskServiceImpl implements TaskService {
             // 根据输出格式处理
             if ("CSV".equalsIgnoreCase(outputFormat)) {
                 try {
-                    System.out.println("输出格式: CSV");
+                    logger.debug("输出格式: CSV");
                     // 创建输出目录
                     String outputDir = outputLocation;
                     if (outputDir == null || outputDir.isEmpty()) {
@@ -565,7 +569,7 @@ public class TaskServiceImpl implements TaskService {
                     java.io.File directory = new java.io.File(outputDir);
                     if (!directory.exists()) {
                         if (directory.mkdirs()) {
-                            System.out.println("成功创建目录: " + outputDir);
+                            logger.debug("成功创建目录: {}", outputDir);
                         } else {
                             throw new RuntimeException("无法创建目录: " + outputDir);
                         }
@@ -577,7 +581,7 @@ public class TaskServiceImpl implements TaskService {
                     String filePath = outputDir + "/" + fileName;
                     
                     // 将数据写入CSV文件
-                    System.out.println("开始写入CSV文件: " + filePath);
+                    logger.debug("开始写入CSV文件: {}", filePath);
                     taskRepository.save(task);
                     
                     try (java.io.FileWriter writer = new java.io.FileWriter(filePath)) {
@@ -600,16 +604,16 @@ public class TaskServiceImpl implements TaskService {
                     }
                     
                     task.setExecutionLog(task.getExecutionLog() + "\n成功生成CSV文件: " + filePath);
-                    System.out.println("成功生成CSV文件: " + filePath);
+                    logger.debug("成功生成CSV文件: {}", filePath);
                 } catch (Exception e) {
-                    System.err.println("生成CSV文件失败: " + e.getMessage());
+                    logger.error("生成CSV文件失败: {}", e.getMessage());
                     e.printStackTrace();
                     task.setExecutionLog(task.getExecutionLog() + "\nCSV文件生成失败: " + e.getMessage());
                     throw new RuntimeException("生成CSV文件失败", e);
                 }
             } else if ("JSON".equalsIgnoreCase(outputFormat)) {
                 try {
-                    System.out.println("输出格式: JSON");
+                    logger.debug("输出格式: JSON");
                     // 创建输出目录
                     String outputDir = outputLocation;
                     if (outputDir == null || outputDir.isEmpty()) {
@@ -620,7 +624,7 @@ public class TaskServiceImpl implements TaskService {
                     java.io.File directory = new java.io.File(outputDir);
                     if (!directory.exists()) {
                         if (directory.mkdirs()) {
-                            System.out.println("成功创建目录: " + outputDir);
+                            logger.debug("成功创建目录: {}", outputDir);
                         } else {
                             throw new RuntimeException("无法创建目录: " + outputDir);
                         }
@@ -632,7 +636,7 @@ public class TaskServiceImpl implements TaskService {
                     String filePath = outputDir + "/" + fileName;
                     
                     // 将数据写入JSON文件
-                    System.out.println("开始写入JSON文件: " + filePath);
+                    logger.debug("开始写入JSON文件: {}", filePath);
                     taskRepository.save(task);
                     
                     try (java.io.FileWriter writer = new java.io.FileWriter(filePath)) {
@@ -642,16 +646,16 @@ public class TaskServiceImpl implements TaskService {
                     }
                     
                     task.setExecutionLog(task.getExecutionLog() + "\n成功生成JSON文件: " + filePath);
-                    System.out.println("成功生成JSON文件: " + filePath);
+                    logger.debug("成功生成JSON文件: {}", filePath);
                 } catch (Exception e) {
-                    System.err.println("生成JSON文件失败: " + e.getMessage());
+                    logger.error("生成JSON文件失败: {}", e.getMessage());
                     e.printStackTrace();
                     task.setExecutionLog(task.getExecutionLog() + "\nJSON文件生成失败: " + e.getMessage());
                     throw new RuntimeException("生成JSON文件失败", e);
                 }
             } else if ("DATABASE".equalsIgnoreCase(outputFormat) || "original".equalsIgnoreCase(outputFormat)) {
                 try {
-                    System.out.println("输出格式: " + outputFormat);
+                    logger.debug("输出格式: {}", outputFormat);
                     // 获取目标表名
                     String targetTable = outputTable;
                     if (targetTable == null || targetTable.isEmpty()) {
@@ -663,7 +667,7 @@ public class TaskServiceImpl implements TaskService {
                         targetTable = MASKED_TABLE_PREFIX + targetTable;
                     }
                     
-                    System.out.println("开始创建目标表并写入数据: " + targetTable);
+                    logger.debug("开始创建目标表并写入数据: {}", targetTable);
                     taskRepository.save(task);
                     
                     // 判断是否为同库同表场景（覆盖原表）
@@ -674,9 +678,9 @@ public class TaskServiceImpl implements TaskService {
                     boolean success;
                     if (isSameTable) {
                         // 同库同表场景：备份原表并覆盖
-                        System.out.println("检测到同库同表脱敏场景（覆盖原表）");
+                        logger.debug("检测到同库同表脱敏场景（覆盖原表）");
                         String backupTableName = sourceTables + "_backup_" + DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now());
-                        System.out.println("备份原表到: " + backupTableName);
+                        logger.debug("备份原表到: {}", backupTableName);
                         
                         // 1. 备份原表
                         String backupSql = "CREATE TABLE " + backupTableName + " AS SELECT * FROM " + sourceTables;
@@ -692,22 +696,22 @@ public class TaskServiceImpl implements TaskService {
                         task.setExecutionLog(task.getExecutionLog() + "\n原表已备份为: " + backupTableName);
                     } else if (isSameDatabase) {
                         // 同库不同表场景：创建新表并插入数据
-                        System.out.println("检测到同库不同表脱敏场景");
+                        logger.debug("检测到同库不同表脱敏场景");
                         success = staticDataMaskingService.createTableAndInsertData(targetTable, maskedData);
                     } else {
                         // 跨库场景：创建新表并插入数据（实际实现可能需要更多的配置）
-                        System.out.println("检测到跨库脱敏场景");
+                        logger.debug("检测到跨库脱敏场景");
                         success = staticDataMaskingService.createTableAndInsertData(targetTable, maskedData);
                     }
                     
                     if (success) {
                         task.setExecutionLog(task.getExecutionLog() + "\n成功创建并写入数据库表: " + targetTable);
-                        System.out.println("成功创建并写入数据库表: " + targetTable);
+                        logger.debug("成功创建并写入数据库表: {}", targetTable);
                     } else {
                         throw new RuntimeException("写入数据库表失败");
                     }
                 } catch (Exception e) {
-                    System.err.println("写入数据库表失败: " + e.getMessage());
+                    logger.error("写入数据库表失败: {}", e.getMessage());
                     e.printStackTrace();
                     task.setExecutionLog(task.getExecutionLog() + "\n写入数据库表失败: " + e.getMessage());
                     throw new RuntimeException("写入数据库表失败", e);
@@ -720,12 +724,12 @@ public class TaskServiceImpl implements TaskService {
             task.setExecutionLog(task.getExecutionLog() + "\n脱敏任务完成");
 
             // 添加详细的完成信息
-            System.out.println("====== 脱敏任务执行结果 ======");
-            System.out.println("任务ID: " + task.getId());
-            System.out.println("任务名称: " + task.getTaskName());
-            System.out.println("原始数据量: " + (originalData != null ? originalData.size() : 0));
-            System.out.println("脱敏数据量: " + (maskedData != null ? maskedData.size() : 0));
-            System.out.println("规则数量: " + (maskingRules != null ? maskingRules.size() : 0));
+            logger.debug("====== 脱敏任务执行结果 ======");
+            logger.debug("任务ID: {}", task.getId());
+            logger.debug("任务名称: {}", task.getTaskName());
+            logger.debug("原始数据量: {}", (originalData != null ? originalData.size() : 0));
+            logger.debug("脱敏数据量: {}", (maskedData != null ? maskedData.size() : 0));
+            logger.debug("规则数量: {}", (maskingRules != null ? maskingRules.size() : 0));
             
             // 计算脱敏数据与原始数据的差异统计
             if (originalData != null && !originalData.isEmpty() && maskedData != null && !maskedData.isEmpty() && 
@@ -754,13 +758,13 @@ public class TaskServiceImpl implements TaskService {
                     }
                 }
                 
-                System.out.println("脱敏统计:");
-                System.out.println("  - 被修改的记录数: " + modifiedRows);
-                System.out.println("  - 被修改的字段数: " + modifiedFields);
+                logger.debug("脱敏统计:");
+                logger.debug("  - 被修改的记录数: {}", modifiedRows);
+                logger.debug("  - 被修改的字段数: {}", modifiedFields);
                 
                 // 输出示例脱敏效果
                 if (modifiedRows > 0 && !originalData.isEmpty()) {
-                    System.out.println("\n脱敏效果示例 (第一条修改记录):");
+                    logger.debug("\n脱敏效果示例 (第一条修改记录):");
                     boolean foundExample = false;
                     
                     for (int i = 0; i < Math.min(originalData.size(), 5) && !foundExample; i++) {
@@ -775,11 +779,11 @@ public class TaskServiceImpl implements TaskService {
                             if (origValue != null && maskValue != null && !origValue.equals(maskValue)) {
                                 if (!hasChanges) {
                                     hasChanges = true;
-                                    System.out.println("记录 #" + (i+1) + ":");
+                                    logger.debug("记录 #{}:", i+1);
                                 }
-                                System.out.println("  - 字段: " + key);
-                                System.out.println("    原始值: " + origValue);
-                                System.out.println("    脱敏后: " + maskValue);
+                                logger.debug("  - 字段: {}", key);
+                                logger.debug("    原始值: {}", origValue);
+                                logger.debug("    脱敏后: {}", maskValue);
                             }
                         }
                         
@@ -789,19 +793,19 @@ public class TaskServiceImpl implements TaskService {
                     }
                     
                     if (!foundExample) {
-                        System.out.println("未找到示例记录");
+                        logger.debug("未找到示例记录");
                     }
                 }
             } else {
-                System.out.println("注意: 脱敏前后数据量不一致或为空，无法计算差异统计");
+                logger.debug("注意: 脱敏前后数据量不一致或为空，无法计算差异统计");
             }
             
-            System.out.println("==================================");
+            logger.debug("==================================");
             
             // 保存任务状态
             taskRepository.save(task);
         } catch (Exception e) {
-            System.err.println("脱敏任务执行失败: " + e.getMessage() + ", 任务ID: " + task.getId());
+            logger.error("脱敏任务执行失败: {}, 任务ID: {}", e.getMessage(), task.getId(), e);
             e.printStackTrace();
             throw new RuntimeException("脱敏任务执行失败: " + e.getMessage(), e);
         }
@@ -810,20 +814,20 @@ public class TaskServiceImpl implements TaskService {
     // 处理任务执行异常
     private void handleTaskException(Long taskId, Exception e) {
         try {
-            System.out.println("处理任务异常, 任务ID: " + taskId + ", 错误信息: " + e.getMessage());
+            logger.error("处理任务异常, 任务ID: {}, 错误信息: {}", taskId, e.getMessage());
             Task task = taskRepository.findById(taskId).orElse(null);
             if (task != null) {
                 task.setStatus("失败");
                 task.setExecutionLog("任务执行失败: " + e.getMessage());
                 task.setUpdateTime(LocalDateTime.now());
                 taskRepository.save(task);
-                System.out.println("任务状态已更新为'失败', 任务ID: " + taskId);
+                logger.info("任务状态已更新为'失败', 任务ID: {}", taskId);
             } else {
-                System.out.println("找不到任务记录, 无法更新状态, 任务ID: " + taskId);
+                logger.info("找不到任务记录, 无法更新状态, 任务ID: {}", taskId);
             }
         } catch (Exception ex) {
             // 记录日志
-            System.err.println("处理任务异常失败: " + ex.getMessage() + ", 任务ID: " + taskId);
+            logger.error("处理任务异常失败: {}, 任务ID: {}", ex.getMessage(), taskId, ex);
             ex.printStackTrace();
         }
     }
@@ -834,7 +838,7 @@ public class TaskServiceImpl implements TaskService {
     private boolean insertDataToExistingTable(String targetTable, List<Map<String, Object>> maskedData) {
         try {
             if (maskedData == null || maskedData.isEmpty()) {
-                System.out.println("没有可插入的数据");
+                logger.debug("没有可插入的数据");
                 return false;
             }
             
@@ -865,7 +869,7 @@ public class TaskServiceImpl implements TaskService {
             String insertSqlStr = insertSql.substring(0, insertSql.length() - 2) + ")";
             
             // 批量插入数据
-            System.out.println("执行插入数据SQL: " + insertSqlStr);
+            logger.debug("执行插入数据SQL: {}", insertSqlStr);
             int count = 0;
             for (Map<String, Object> row : maskedData) {
                 // 准备插入参数
@@ -881,11 +885,11 @@ public class TaskServiceImpl implements TaskService {
                 count++;
             }
             
-            System.out.println("成功插入" + count + "条数据到" + targetTable);
+            logger.debug("成功插入{}条数据到{}", count, targetTable);
             return true;
             
         } catch (Exception e) {
-            System.err.println("插入数据失败: " + e.getMessage());
+            logger.error("插入数据失败: {}", e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("插入数据失败", e);
         }

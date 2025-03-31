@@ -1,7 +1,10 @@
 package com.example.interceptor;
 
 import com.example.model.MaskingRuleEntity;
+import com.example.util.LogUtils;
 import org.hibernate.resource.jdbc.spi.StatementInspector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -11,35 +14,38 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class SQLMaskingInterceptor implements StatementInspector {
     
+    private static final Logger logger = LoggerFactory.getLogger(SQLMaskingInterceptor.class);
     private final Map<String, List<MaskingRuleEntity>> maskingRules = new ConcurrentHashMap<>();
     
     @Override
     public String inspect(String sql) {
         // 添加调试日志，查看是否拦截到了SQL
-        System.out.println("SQLMaskingInterceptor: 拦截到SQL: " + sql);
+        logger.debug("拦截到SQL: {}", sql);
         
         // 检查是否有脱敏规则
-        System.out.println("SQLMaskingInterceptor: maskingRules.size() = " + maskingRules.size() + ", isEmpty = " + maskingRules.isEmpty());
+        logger.debug("maskingRules.size() = {}, isEmpty = {}", maskingRules.size(), maskingRules.isEmpty());
         
         if (maskingRules.isEmpty()) {
-            System.out.println("SQLMaskingInterceptor: 没有脱敏规则，原样返回SQL");
+            logger.debug("没有脱敏规则，原样返回SQL");
             return sql;
         }
         
         // 输出当前所有的脱敏规则
-        printAllMaskingRules();
+        if (logger.isDebugEnabled()) {
+            printAllMaskingRules();
+        }
         
         // 解析SQL语句，识别表名和列名
         String tableName = extractTableName(sql);
         if (tableName == null) {
-            System.out.println("SQLMaskingInterceptor: 无法提取表名，原样返回SQL");
+            logger.debug("无法提取表名，原样返回SQL");
             return sql;
         }
         
         // 获取该表的脱敏规则
         List<MaskingRuleEntity> rules = maskingRules.get(tableName);
         if (rules == null || rules.isEmpty()) {
-            System.out.println("SQLMaskingInterceptor: 表 " + tableName + " 没有对应的脱敏规则，原样返回SQL");
+            logger.debug("表 {} 没有对应的脱敏规则，原样返回SQL", tableName);
             return sql;
         }
         
@@ -47,8 +53,8 @@ public class SQLMaskingInterceptor implements StatementInspector {
         String modifiedSql = modifySQL(sql, rules);
         
         // 添加日志输出，方便调试
-        System.out.println("Original SQL: " + sql);
-        System.out.println("Modified SQL: " + modifiedSql);
+        logger.debug("Original SQL: {}", sql);
+        logger.debug("Modified SQL: {}", modifiedSql);
         
         return modifiedSql;
     }
@@ -56,7 +62,7 @@ public class SQLMaskingInterceptor implements StatementInspector {
     private String extractTableName(String sql) {
         try {
             // 简单的SQL解析，提取表名
-            System.out.println("开始从SQL中提取表名: " + sql);
+            logger.debug("开始从SQL中提取表名: {}", sql);
             sql = sql.toLowerCase();
             
             // 处理SELECT语句
@@ -72,7 +78,7 @@ public class SQLMaskingInterceptor implements StatementInspector {
                         if (tablePart.contains(".")) {
                             tablePart = tablePart.substring(tablePart.lastIndexOf(".") + 1);
                         }
-                        System.out.println("从SQL中提取到表名: " + tablePart);
+                        logger.debug("从SQL中提取到表名: {}", tablePart);
                         
                         // 不进行驼峰命名转换，直接返回原始表名
                         return tablePart;
@@ -80,11 +86,10 @@ public class SQLMaskingInterceptor implements StatementInspector {
                 }
             }
             
-            System.out.println("无法从SQL中提取表名");
+            logger.debug("无法从SQL中提取表名");
             return null;
         } catch (Exception e) {
-            System.err.println("提取表名时出错: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("提取表名时出错: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -94,12 +99,14 @@ public class SQLMaskingInterceptor implements StatementInspector {
             // 根据脱敏规则修改SQL
             StringBuilder modifiedSql = new StringBuilder(sql);
             
-            System.out.println("开始应用脱敏规则，规则数量: " + rules.size());
+            logger.debug("开始应用脱敏规则，规则数量: {}", rules.size());
             for (MaskingRuleEntity rule : rules) {
-                System.out.println("处理规则: " + rule.getTableName() + "." + rule.getColumnName() + ", 脱敏类型: " + rule.getMaskingType() + ", 活动状态: " + rule.isActive());
+                logger.debug("处理规则: {}.{}, 脱敏类型: {}, 活动状态: {}", 
+                            rule.getTableName(), rule.getColumnName(), 
+                            rule.getMaskingType(), rule.isActive());
                 
                 if (!rule.isActive()) {
-                    System.out.println("规则未激活，跳过");
+                    logger.debug("规则未激活，跳过");
                     continue;
                 }
                 
@@ -132,20 +139,18 @@ public class SQLMaskingInterceptor implements StatementInspector {
                             modifiedSql = replaceColumnWithRandom(modifiedSql, qualifiedColumnName);
                             break;
                         default:
-                            System.out.println("未知的脱敏类型: " + maskingType);
+                            logger.debug("未知的脱敏类型: {}", maskingType);
                             break;
                     }
-                    System.out.println("应用脱敏规则后的SQL: " + modifiedSql);
+                    logger.debug("应用脱敏规则后的SQL: {}", modifiedSql);
                 } catch (Exception e) {
-                    System.err.println("应用脱敏规则时发生错误: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("应用脱敏规则时发生错误: {}", e.getMessage(), e);
                 }
             }
             
             return modifiedSql.toString();
         } catch (Exception e) {
-            System.err.println("修改SQL出现一般错误: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("修改SQL出现一般错误: {}", e.getMessage(), e);
             return sql; // 发生错误时返回原始SQL
         }
     }
@@ -199,17 +204,16 @@ public class SQLMaskingInterceptor implements StatementInspector {
             String pattern = "\\b" + columnName + "\\b";
             String replacement = "'" + mask + "'";
             
-            System.out.println("完全遮盖替换前SQL: " + sql);
-            System.out.println("模式: " + pattern);
-            System.out.println("替换值: " + replacement);
+            logger.debug("完全遮盖替换前SQL: {}", sql);
+            logger.debug("模式: {}", pattern);
+            logger.debug("替换值: {}", replacement);
             
             String result = sql.toString().replaceAll(pattern, replacement);
-            System.out.println("完全遮盖替换后SQL: " + result);
+            logger.debug("完全遮盖替换后SQL: {}", result);
             
             return new StringBuilder(result);
         } catch (Exception e) {
-            System.err.println("完全遮盖替换时出错: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("完全遮盖替换时出错: {}", e.getMessage(), e);
             return sql;
         }
     }
@@ -221,17 +225,16 @@ public class SQLMaskingInterceptor implements StatementInspector {
             // 使用MySQL函数语法，去掉表限定符
             String replacement = "CONCAT(SUBSTRING(" + columnName + ", 1, 3), '****', SUBSTRING(" + columnName + ", -4))";
             
-            System.out.println("替换前SQL: " + sql);
-            System.out.println("模式: " + pattern);
-            System.out.println("替换值: " + replacement);
+            logger.debug("替换前SQL: {}", sql);
+            logger.debug("模式: {}", pattern);
+            logger.debug("替换值: {}", replacement);
             
             String result = sql.toString().replaceAll(pattern, replacement);
-            System.out.println("替换后SQL: " + result);
+            logger.debug("替换后SQL: {}", result);
             
             return new StringBuilder(result);
         } catch (Exception e) {
-            System.err.println("部分遮盖替换时出错: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("部分遮盖替换时出错: {}", e.getMessage(), e);
             return sql;
         }
     }
@@ -242,17 +245,16 @@ public class SQLMaskingInterceptor implements StatementInspector {
             String pattern = "\\b" + columnName + "\\b";
             String replacement = "'" + value + "'";
             
-            System.out.println("替换值替换前SQL: " + sql);
-            System.out.println("模式: " + pattern);
-            System.out.println("替换值: " + replacement);
+            logger.debug("替换值替换前SQL: {}", sql);
+            logger.debug("模式: {}", pattern);
+            logger.debug("替换值: {}", replacement);
             
             String result = sql.toString().replaceAll(pattern, replacement);
-            System.out.println("替换值替换后SQL: " + result);
+            logger.debug("替换值替换后SQL: {}", result);
             
             return new StringBuilder(result);
         } catch (Exception e) {
-            System.err.println("替换值替换时出错: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("替换值替换时出错: {}", e.getMessage(), e);
             return sql;
         }
     }
@@ -263,17 +265,16 @@ public class SQLMaskingInterceptor implements StatementInspector {
             String pattern = "\\b" + columnName + "\\b";
             String replacement = "MD5(" + columnName + ")";
             
-            System.out.println("哈希替换前SQL: " + sql);
-            System.out.println("模式: " + pattern);
-            System.out.println("替换值: " + replacement);
+            logger.debug("哈希替换前SQL: {}", sql);
+            logger.debug("模式: {}", pattern);
+            logger.debug("替换值: {}", replacement);
             
             String result = sql.toString().replaceAll(pattern, replacement);
-            System.out.println("哈希替换后SQL: " + result);
+            logger.debug("哈希替换后SQL: {}", result);
             
             return new StringBuilder(result);
         } catch (Exception e) {
-            System.err.println("哈希替换时出错: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("哈希替换时出错: {}", e.getMessage(), e);
             return sql;
         }
     }
@@ -284,17 +285,16 @@ public class SQLMaskingInterceptor implements StatementInspector {
             String pattern = "\\b" + columnName + "\\b";
             String replacement = "CONCAT('RAND_', FLOOR(RAND() * 1000))";
             
-            System.out.println("随机化替换前SQL: " + sql);
-            System.out.println("模式: " + pattern);
-            System.out.println("替换值: " + replacement);
+            logger.debug("随机化替换前SQL: {}", sql);
+            logger.debug("模式: {}", pattern);
+            logger.debug("替换值: {}", replacement);
             
             String result = sql.toString().replaceAll(pattern, replacement);
-            System.out.println("随机化替换后SQL: " + result);
+            logger.debug("随机化替换后SQL: {}", result);
             
             return new StringBuilder(result);
         } catch (Exception e) {
-            System.err.println("随机化替换时出错: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("随机化替换时出错: {}", e.getMessage(), e);
             return sql;
         }
     }
@@ -311,22 +311,26 @@ public class SQLMaskingInterceptor implements StatementInspector {
      * 输出当前所有的脱敏规则
      */
     public void printAllMaskingRules() {
-        System.out.println("==================== 当前所有脱敏规则 ====================");
         if (maskingRules.isEmpty()) {
-            System.out.println("没有配置任何脱敏规则");
-        } else {
-            System.out.println("共有 " + maskingRules.size() + " 个表配置了脱敏规则");
-            for (Map.Entry<String, List<MaskingRuleEntity>> entry : maskingRules.entrySet()) {
-                String tableName = entry.getKey();
-                List<MaskingRuleEntity> rules = entry.getValue();
-                System.out.println("表 '" + tableName + "' 配置了 " + rules.size() + " 条规则:");
-                for (MaskingRuleEntity rule : rules) {
-                    System.out.println("    列: " + rule.getColumnName() + 
-                                       ", 脱敏类型: " + rule.getMaskingType() + 
-                                       ", 活动状态: " + (rule.isActive() ? "启用" : "禁用"));
-                }
-            }
+            logger.debug("当前没有配置任何脱敏规则");
+            return;
         }
-        System.out.println("===========================================================");
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("==================== 当前所有脱敏规则 ====================\n");
+        sb.append("共有 ").append(maskingRules.size()).append(" 个表配置了脱敏规则\n");
+        
+        maskingRules.forEach((tableName, rules) -> {
+            sb.append("表 '").append(tableName).append("' 配置了 ").append(rules.size()).append(" 条规则:\n");
+            rules.forEach(rule -> {
+                sb.append("    列: ").append(rule.getColumnName())
+                  .append(", 脱敏类型: ").append(rule.getMaskingType())
+                  .append(", 活动状态: ").append(rule.isActive() ? "启用" : "禁用")
+                  .append("\n");
+            });
+        });
+        
+        sb.append("===========================================================");
+        logger.debug(sb.toString());
     }
 } 

@@ -102,25 +102,25 @@ public class DataMaskingServiceImpl implements DataMaskingService {
             
             // 添加更详细的规则内容输出
             if (rules != null && !rules.isEmpty()) {
-                System.out.println("====== 规则对象详细信息 ======");
+                logger.debug("====== 规则对象详细信息 ======");
                 for (int i = 0; i < rules.size(); i++) {
                     Object rule = rules.get(i);
-                    System.out.println("规则[" + i + "] 类型: " + rule.getClass().getName());
-                    System.out.println("规则[" + i + "] 内容: " + rule);
+                    logger.debug("规则[{}] 类型: {}", i, rule.getClass().getName());
+                    logger.debug("规则[{}] 内容: {}", i, rule);
                     // 如果是MaskingRuleDTO，单独输出其关键属性
                     if (rule instanceof MaskingRuleDTO) {
                         MaskingRuleDTO dto = (MaskingRuleDTO) rule;
-                        System.out.println("  - 数据库: " + dto.getDatabase());
-                        System.out.println("  - 表名: " + dto.getTableName()); 
-                        System.out.println("  - 列名: " + dto.getColumnName());
-                        System.out.println("  - 脱敏类型: " + dto.getMaskingType());
-                        System.out.println("  - 是否激活: " + dto.isActive());
-                        System.out.println("  - 前缀长度: " + dto.getPrefixLength());
-                        System.out.println("  - 后缀长度: " + dto.getSuffixLength());
-                        System.out.println("  - 替换字符: " + dto.getReplacementChar());
+                        logger.debug("  - 数据库: {}", dto.getDatabase());
+                        logger.debug("  - 表名: {}", dto.getTableName());
+                        logger.debug("  - 列名: {}", dto.getColumnName());
+                        logger.debug("  - 脱敏类型: {}", dto.getMaskingType());
+                        logger.debug("  - 是否激活: {}", dto.isActive());
+                        logger.debug("  - 前缀长度: {}", dto.getPrefixLength());
+                        logger.debug("  - 后缀长度: {}", dto.getSuffixLength());
+                        logger.debug("  - 替换字符: {}", dto.getReplacementChar());
                     }
                 }
-                System.out.println("===========================");
+                logger.debug("===========================");
             }
             
             // 获取原始数据
@@ -137,10 +137,10 @@ public class DataMaskingServiceImpl implements DataMaskingService {
                 Map<String, Object> firstRow = originalData.get(0);
                 logger.debug("原始数据第一条记录字段: {}", firstRow.keySet());
                 // 详细输出列名供对比
-                System.out.println("====== 数据表列名详情 ======");
-                System.out.println("表: " + sourceTables);
-                System.out.println("可用列名: " + firstRow.keySet());
-                System.out.println("============================");
+                logger.debug("====== 数据表列名详情 ======");
+                logger.debug("表: {}", sourceTables);
+                logger.debug("可用列名: {}", firstRow.keySet());
+                logger.debug("============================");
             }
             
             // 如果没有规则或规则为空，直接返回原始数据
@@ -163,36 +163,34 @@ public class DataMaskingServiceImpl implements DataMaskingService {
                 for (Object ruleObj : rules) {
                     Map<String, Object> rule = convertRuleToMap(ruleObj);
                     if (rule == null) {
-                        System.out.println("规则转换失败: " + ruleObj);
+                        logger.debug("规则转换失败: {}", ruleObj);
                         continue;  // 无法处理的规则类型
                     }
                     
                     // 详细输出转换后的规则Map
-                    System.out.println("====== 转换后的规则Map ======");
-                    System.out.println("原始规则对象类型: " + ruleObj.getClass().getName());
-                    System.out.println("转换后Map内容: " + rule);
-                    System.out.println("============================");
+                    logger.debug("====== 转换后的规则Map ======");
+                    logger.debug("原始规则对象类型: {}", ruleObj.getClass().getName());
+                    logger.debug("转换后Map内容: {}", rule);
+                    logger.debug("============================");
                     
                     // 获取规则相关信息
                     String columnName = extractColumnNameFromRule(rule);
                     String maskingType = extractMaskingTypeFromRule(rule);
                     Boolean isActive = extractIsActiveFromRule(rule);
                     
-                    System.out.println("提取的列名: " + columnName);
-                    System.out.println("提取的脱敏类型: " + maskingType);
-                    System.out.println("提取的激活状态: " + isActive);
+                    logger.debug("提取的列名: {}", columnName);
+                    logger.debug("提取的脱敏类型: {}", maskingType);
+                    logger.debug("提取的激活状态: {}", isActive);
                     
                     // 检查规则是否激活
                     if (isActive != null && !isActive) {
                         logger.debug("规则未激活，跳过: columnName={}, maskingType={}", columnName, maskingType);
-                        System.out.println("规则未激活，跳过此规则");
                         continue;  // 跳过未激活的规则
                     }
                     
                     // 如果列名为null或空，跳过此规则
                     if (columnName == null || columnName.isEmpty()) {
                         logger.debug("规则中列名为空，跳过规则: {}", rule);
-                        System.out.println("规则中列名为空，跳过此规则");
                         continue;
                     }
                     
@@ -201,55 +199,54 @@ public class DataMaskingServiceImpl implements DataMaskingService {
                     String matchedColumn = null;
                     
                     // 输出尝试匹配的详细信息
-                    System.out.println("====== 列名匹配过程 ======");
-                    System.out.println("要匹配的列名: " + columnName);
+                    logger.debug("====== 列名匹配过程 ======");
+                    logger.debug("要匹配的列名: {}", columnName);
                     
                     // 直接匹配
                     if (row.containsKey(columnName)) {
                         value = row.get(columnName);
                         matchedColumn = columnName;
-                        System.out.println("直接匹配成功: " + columnName);
+                        logger.debug("直接匹配成功: {}", columnName);
                     } 
                     // 尝试小写匹配
                     else if (row.containsKey(columnName.toLowerCase())) {
                         value = row.get(columnName.toLowerCase());
                         matchedColumn = columnName.toLowerCase();
-                        System.out.println("小写匹配成功: " + matchedColumn);
+                        logger.debug("小写匹配成功: {}", matchedColumn);
                     } 
                     // 尝试首字母大写匹配
                     else if (row.containsKey(columnName.substring(0, 1).toUpperCase() + columnName.substring(1))) {
                         String capitalizedColumn = columnName.substring(0, 1).toUpperCase() + columnName.substring(1);
                         value = row.get(capitalizedColumn);
                         matchedColumn = capitalizedColumn;
-                        System.out.println("首字母大写匹配成功: " + matchedColumn);
+                        logger.debug("首字母大写匹配成功: {}", matchedColumn);
                     }
                     // 对所有列名进行不区分大小写的匹配
                     else {
-                        System.out.println("尝试不区分大小写匹配...");
+                        logger.debug("尝试不区分大小写匹配...");
                         for (String key : row.keySet()) {
-                            System.out.println("  - 检查列: " + key);
+                            logger.debug("  - 检查列: {}", key);
                             if (key.equalsIgnoreCase(columnName)) {
                                 value = row.get(key);
                                 matchedColumn = key;
-                                System.out.println("  -> 不区分大小写匹配成功: " + matchedColumn);
+                                logger.debug("  -> 不区分大小写匹配成功: {}", matchedColumn);
                                 break;
                             }
                         }
                     }
-                    System.out.println("匹配结果: " + (matchedColumn != null ? "成功 - " + matchedColumn : "失败"));
-                    System.out.println("===========================");
+                    logger.debug("匹配结果: {}", (matchedColumn != null ? "成功 - " + matchedColumn : "失败"));
+                    logger.debug("===========================");
                     
                     // 检查是否找到匹配的列
                     if (matchedColumn == null) {
                         logger.debug("在数据中找不到对应的列: {}, 可用列: {}", columnName, row.keySet());
-                        System.out.println("警告: 在数据中找不到对应的列: " + columnName);
                         continue;
                     }
                     
                     // 只有当值不为null时才进行脱敏
                     if (value != null) {
                         logger.debug("对列{}应用{}脱敏规则，原始值: {}", matchedColumn, maskingType, value);
-                        System.out.println("开始脱敏处理 - 列: " + matchedColumn + ", 类型: " + maskingType + ", 原始值: " + value);
+                        logger.debug("开始脱敏处理 - 列: {}，类型: {}，原始值: {}", matchedColumn, maskingType, value);
                         
                         Object maskedValue = applyMasking(value, maskingType, rule);
                         
@@ -259,13 +256,11 @@ public class DataMaskingServiceImpl implements DataMaskingService {
                             maskedFields++;
                             rowMasked = true;
                             logger.debug("列{}脱敏后的值: {}", matchedColumn, maskedValue);
-                            System.out.println("脱敏成功 - 新值: " + maskedValue);
                         } else {
                             logger.debug("列{}的值没有变化，可能是脱敏规则无效", matchedColumn);
-                            System.out.println("警告: 脱敏后的值没有变化，可能是脱敏规则无效");
                         }
                     } else {
-                        System.out.println("列值为null，跳过脱敏处理");
+                        logger.debug("列值为null，跳过脱敏处理");
                     }
                 }
                 
@@ -276,11 +271,11 @@ public class DataMaskingServiceImpl implements DataMaskingService {
             }
             
             logger.info("完成脱敏处理，共处理{}条记录，{}个字段被脱敏", processedRows, maskedFields);
-            System.out.println("====== 脱敏处理统计 ======");
-            System.out.println("处理总记录数: " + originalData.size());
-            System.out.println("成功脱敏记录数: " + processedRows);
-            System.out.println("脱敏字段总数: " + maskedFields);
-            System.out.println("===========================");
+            logger.debug("====== 脱敏处理统计 ======");
+            logger.debug("处理总记录数: {}", originalData.size());
+            logger.debug("成功脱敏记录数: {}", processedRows);
+            logger.debug("脱敏字段总数: {}", maskedFields);
+            logger.debug("===========================");
             
             return maskedData;
         } catch (Exception e) {
@@ -292,12 +287,12 @@ public class DataMaskingServiceImpl implements DataMaskingService {
     // 将不同类型的规则对象转换为统一的Map格式
     private Map<String, Object> convertRuleToMap(Object ruleObj) {
         try {
-            System.out.println("====== 开始转换规则对象 ======");
-            System.out.println("规则对象类型: " + ruleObj.getClass().getName());
+            logger.debug("====== 开始转换规则对象 ======");
+            logger.debug("规则对象类型: {}", ruleObj.getClass().getName());
             
             // 如果是Map类型，直接使用
             if (ruleObj instanceof Map) {
-                System.out.println("规则对象是Map类型，直接使用");
+                logger.debug("规则对象是Map类型，直接使用");
                 Map<String, Object> ruleMap = (Map<String, Object>) ruleObj;
                 // 确保active字段存在且为true
                 ruleMap.put("active", true);
@@ -305,7 +300,7 @@ public class DataMaskingServiceImpl implements DataMaskingService {
             } 
             // 如果是MaskingRuleDTO类型，转换为Map
             else if (ruleObj instanceof MaskingRuleDTO) {
-                System.out.println("规则对象是MaskingRuleDTO类型，转换为Map");
+                logger.debug("规则对象是MaskingRuleDTO类型，转换为Map");
                 MaskingRuleDTO dto = (MaskingRuleDTO) ruleObj;
                 Map<String, Object> rule = new HashMap<>();
                 rule.put("database", dto.getDatabase());
@@ -325,13 +320,12 @@ public class DataMaskingServiceImpl implements DataMaskingService {
                     rule.put("replacementChar", dto.getReplacementChar());
                 }
                 
-                System.out.println("转换后的Map: " + rule);
+                logger.debug("转换后的Map: {}", rule);
                 return rule;
             } 
             // 如果是其他类型，尝试通过反射获取属性
             else {
                 logger.debug("尝试通过反射处理未知规则类型: {}", ruleObj.getClass().getName());
-                System.out.println("尝试通过反射处理未知规则类型: " + ruleObj.getClass().getName());
                 Map<String, Object> rule = new HashMap<>();
                 
                 for (Method method : ruleObj.getClass().getMethods()) {
@@ -344,30 +338,23 @@ public class DataMaskingServiceImpl implements DataMaskingService {
                             Object value = method.invoke(ruleObj);
                             if (value != null) {
                                 rule.put(propertyName, value);
-                                System.out.println("  提取属性: " + propertyName + " = " + value);
                             }
                         } catch (Exception e) {
                             logger.debug("获取属性值失败: {}", method.getName(), e);
-                            System.out.println("  获取属性值失败: " + method.getName() + ", 错误: " + e.getMessage());
                         }
                     }
                 }
                 
                 if (!rule.isEmpty()) {
-                    System.out.println("通过反射提取的属性Map: " + rule);
+                    logger.debug("通过反射提取的属性Map: {}", rule);
                     return rule;
                 }
             }
             
             logger.warn("无法处理的规则类型: {}", ruleObj.getClass().getName());
-            System.out.println("警告: 无法处理的规则类型: " + ruleObj.getClass().getName());
-            System.out.println("============================");
             return null;
         } catch (Exception e) {
             logger.error("转换规则对象失败", e);
-            System.out.println("错误: 转换规则对象失败: " + e.getMessage());
-            e.printStackTrace();
-            System.out.println("============================");
             return null;
         }
     }
@@ -375,14 +362,14 @@ public class DataMaskingServiceImpl implements DataMaskingService {
     // 从规则中提取列名
     private String extractColumnNameFromRule(Map<String, Object> rule) {
         // 尝试不同的可能键名
-        System.out.println("开始提取列名，尝试键: columnName, column, field, name");
+        logger.debug("开始提取列名，尝试键: columnName, column, field, name");
         for (String key : Arrays.asList("columnName", "column", "field", "name")) {
             if (rule.containsKey(key) && rule.get(key) != null) {
-                System.out.println("找到列名键: " + key + ", 值: " + rule.get(key).toString());
+                logger.debug("找到列名键: {}，值: {}", key, rule.get(key).toString());
                 return rule.get(key).toString();
             }
         }
-        System.out.println("未找到列名键!");
+        logger.debug("未找到列名键!");
         return null;
     }
     
@@ -672,24 +659,24 @@ public class DataMaskingServiceImpl implements DataMaskingService {
         logger.debug("应用脱敏规则: 类型={}, 原始值={}, 规则={}", maskingType, logValue, rule);
         
         // 添加更详细的脱敏处理日志
-        System.out.println("====== 开始脱敏处理 ======");
-        System.out.println("脱敏类型: " + maskingType);
-        System.out.println("原始值: " + logValue);
-        System.out.println("规则参数: " + rule);
+        logger.debug("====== 开始脱敏处理 ======");
+        logger.debug("脱敏类型: {}", maskingType);
+        logger.debug("原始值: {}", logValue);
+        logger.debug("规则参数: {}", rule);
         
         // 打印规则中的关键参数
-        System.out.println("规则详情:");
+        logger.debug("规则详情:");
         if (rule.containsKey("prefixLength")) {
-            System.out.println("  - 前缀长度: " + rule.get("prefixLength"));
+            logger.debug("  - 前缀长度: {}", rule.get("prefixLength"));
         }
         if (rule.containsKey("suffixLength")) {
-            System.out.println("  - 后缀长度: " + rule.get("suffixLength"));
+            logger.debug("  - 后缀长度: {}", rule.get("suffixLength"));
         }
         if (rule.containsKey("replacementChar")) {
-            System.out.println("  - 替换字符: " + rule.get("replacementChar"));
+            logger.debug("  - 替换字符: {}", rule.get("replacementChar"));
         }
         if (rule.containsKey("pattern")) {
-            System.out.println("  - 模式: " + rule.get("pattern"));
+            logger.debug("  - 模式: {}", rule.get("pattern"));
         }
         
         Object maskedValue = null;
@@ -702,46 +689,45 @@ public class DataMaskingServiceImpl implements DataMaskingService {
                 case "PHONE":
                 case "手机号":
                 case "电话号码":
-                    System.out.println("应用手机号脱敏规则");
+                    logger.debug("应用手机号脱敏规则");
                     maskedValue = maskPhone(strValue, rule);
                     break;
                 case "ID_CARD":
                 case "身份证":
                 case "身份证号码":
-                    System.out.println("应用身份证号脱敏规则");
+                    logger.debug("应用身份证号脱敏规则");
                     maskedValue = maskIdCard(strValue, rule);
                     break;
                 case "NAME":
                 case "姓名":
-                    System.out.println("应用姓名脱敏规则");
+                    logger.debug("应用姓名脱敏规则");
                     maskedValue = maskName(strValue, rule);
                     break;
                 case "EMAIL":
                 case "邮箱":
                 case "电子邮箱":
-                    System.out.println("应用邮箱脱敏规则");
+                    logger.debug("应用邮箱脱敏规则");
                     maskedValue = maskEmail(strValue, rule);
                     break;
                 case "BANK_CARD":
                 case "银行卡":
                 case "银行卡号":
-                    System.out.println("应用银行卡号脱敏规则");
+                    logger.debug("应用银行卡号脱敏规则");
                     maskedValue = maskBankCard(strValue, rule);
                     break;
                 case "ADDRESS":
                 case "地址":
-                    System.out.println("应用地址脱敏规则");
+                    logger.debug("应用地址脱敏规则");
                     maskedValue = maskAddress(strValue, rule);
                     break;
                 case "FULL_MASK":
                 case "全遮盖":
                 case "全部遮盖":
-                    System.out.println("应用全遮盖脱敏规则");
+                    logger.debug("应用全遮盖脱敏规则");
                     maskedValue = maskFull(strValue, rule);
                     break;
                 default:
                     logger.warn("未知的脱敏类型: {}, 不进行脱敏", maskingType);
-                    System.out.println("警告: 未知的脱敏类型: " + maskingType + ", 不进行脱敏");
                     return value;  // 默认不处理
             }
             
@@ -750,27 +736,19 @@ public class DataMaskingServiceImpl implements DataMaskingService {
                     maskedValue.toString().substring(0, 20) + "..." : maskedValue.toString();
                 logger.debug("脱敏完成: 原始值={}, 脱敏后值={}, 类型={}", logValue, logMaskedValue, maskingType);
                 
-                System.out.println("脱敏结果: " + logMaskedValue);
-                
                 // 检查脱敏是否实际发生变化
                 if (strValue.equals(maskedValue.toString())) {
                     logger.warn("脱敏后的值与原始值相同: 类型={}, 值={}", maskingType, logValue);
-                    System.out.println("警告: 脱敏后的值与原始值相同!");
-                    System.out.println("  - 原始值: " + strValue);
-                    System.out.println("  - 脱敏后值: " + maskedValue.toString());
                 }
             } else {
                 logger.warn("脱敏结果为null, 返回原始值");
-                System.out.println("警告: 脱敏结果为null, 返回原始值");
                 return value;
             }
             
-            System.out.println("========================");
+            logger.debug("========================");
             return maskedValue;
         } catch (Exception e) {
             logger.error("应用脱敏规则失败: 类型={}, 原始值={}", maskingType, logValue, e);
-            System.out.println("错误: 应用脱敏规则失败: " + e.getMessage());
-            e.printStackTrace();
             return value; // 出错时返回原始值
         }
     }

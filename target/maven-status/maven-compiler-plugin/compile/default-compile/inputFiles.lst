@@ -6,6 +6,7 @@
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/model/EmployeeData.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/DemoApplication.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/AuditLogService.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/config/RequestResponseLoggingFilter.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/repository/MaskingRuleRepository.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/config/JpaConfiguration.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/impl/DataMaskingServiceImpl.java
@@ -19,8 +20,12 @@
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/config/SwaggerConfig.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/DesensitizationRuleService.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/model/MedicalRecord.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/DynamicMaskingController.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/LoginController.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/RabbitMQProducerService.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/UserController.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/config/LoggingConfig.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/AdminController.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/model/Task.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/DataMaskingService.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/dto/MaskingRuleDTO.java
@@ -31,10 +36,13 @@
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/TaskMessageConsumer.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/MaskingRuleService.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/repository/FinancialRecordRepository.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/util/LogUtils.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/interceptor/SQLMaskingInterceptor.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/impl/UserServiceImpl.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/RuleController.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/TaskService.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/AuditLogController.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/filter/JwtAuthenticationFilter.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/impl/SensitiveDataDetectorImpl.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/repository/AuditLogRepository.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/MaskedDataViewController.java
@@ -43,6 +51,7 @@
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/SensitiveDataController.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/util/JwtUtil.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/TestDataController.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/aspect/AuditLogAspect.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/repository/DesensitizationRuleRepository.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/Main.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/SensitiveDataDetector.java
@@ -53,6 +62,8 @@
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/TaskController.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/impl/TaskServiceImpl.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/model/OnlineTransaction.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/interceptor/AuditLogInterceptor.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/RoleController.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/MaskingRuleController.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/dto/MaskingRuleResponse.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/config/AppConfig.java
@@ -68,4 +79,6 @@
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/dto/MaskingRuleRequest.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/StaticDataMaskingService.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/MaskedDataService.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/UserService.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/RabbitMQConsumerService.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/util/PasswordMigrationUtil.java

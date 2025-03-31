@@ -29,51 +29,31 @@ public class StaticDataMaskingService {
      */
     public List<Map<String, Object>> getRulesByIds(List<String> ruleIds) {
         logger.info("获取脱敏规则, 规则ID数量: {}", ruleIds.size());
-        System.out.println("========== 开始获取脱敏规则 ==========");
-        System.out.println("传入规则ID数量: " + ruleIds.size());
-        
-        // 添加详细输出 - 打印每个规则ID
-        for (int i = 0; i < ruleIds.size(); i++) {
-            System.out.println("查询规则ID[" + i + "]: '" + ruleIds.get(i) + "'");
-        }
         
         List<Map<String, Object>> rules = new ArrayList<>();
         
         for (String ruleId : ruleIds) {
-            System.out.println("查询规则ID: " + ruleId);
-            
             // 获取并转换规则
             Optional<DesensitizationRule> ruleOpt = desensitizationRuleService.getRuleById(ruleId);
             
             // 检查规则是否存在
             boolean exists = ruleOpt.isPresent();
-            System.out.println("数据库中存在此规则ID: " + exists);
             
             if (exists) {
                 DesensitizationRule rule = ruleOpt.get();
                 Map<String, Object> ruleMap = convertRuleToMap(rule);
                 rules.add(ruleMap);
-                System.out.println("成功获取规则: " + rule.getName() + ", 类型: " + rule.getType());
+                logger.info("成功获取规则: {}, 类型: {}", rule.getName(), rule.getType());
             } else {
-                System.out.println("警告: 找不到ID为'" + ruleId + "'的规则");
+                logger.warn("找不到ID为'{}'的规则", ruleId);
                 
                 // 尝试查找可能的匹配
-                System.out.println("尝试查找可能的匹配规则...");
                 List<DesensitizationRule> allRules = desensitizationRuleService.getAllRules();
-                System.out.println("系统中共有 " + allRules.size() + " 条规则");
-                
-                // 打印所有可用规则
-                System.out.println("可用的规则列表:");
-                for (DesensitizationRule availableRule : allRules) {
-                    System.out.println("  - ID: '" + availableRule.getRuleId() + 
-                                     "', 名称: '" + availableRule.getName() + 
-                                     "', 类型: " + availableRule.getType());
-                }
+                logger.debug("系统中共有 {} 条规则", allRules.size());
             }
         }
         
-        System.out.println("成功获取规则数量: " + rules.size());
-        System.out.println("======================================");
+        logger.info("成功获取规则数量: {}", rules.size());
         
         return rules;
     }
@@ -112,25 +92,25 @@ public class StaticDataMaskingService {
         // 打印原始数据的列名，用于调试
         if (!originalData.isEmpty()) {
             Map<String, Object> firstRow = originalData.get(0);
-            System.out.println("====== 原始数据列名信息 ======");
-            System.out.println("原始数据列名: " + firstRow.keySet());
-            System.out.println("============================");
+            logger.debug("====== 原始数据列名信息 ======");
+            logger.debug("原始数据列名: {}", firstRow.keySet());
+            logger.debug("============================");
         }
         
         // 打印规则中的列名，用于对比
-        System.out.println("====== 规则中的列名信息 ======");
+        logger.debug("====== 规则中的列名信息 ======");
         for (int i = 0; i < rules.size(); i++) {
             Map<String, Object> rule = rules.get(i);
             String columnName = extractColumnName(rule);
             String maskingType = extractMaskingType(rule);
             Boolean isActive = extractIsActive(rule);
             
-            System.out.println("规则[" + i + "]:");
-            System.out.println("  - 列名: " + columnName);
-            System.out.println("  - 脱敏类型: " + maskingType);
-            System.out.println("  - 是否激活: " + isActive);
+            logger.debug("规则[{}]:", i);
+            logger.debug("  - 列名: {}", columnName);
+            logger.debug("  - 脱敏类型: {}", maskingType);
+            logger.debug("  - 是否激活: {}", isActive);
         }
-        System.out.println("===========================");
+        logger.debug("===========================");
         
         // 应用脱敏规则
         List<Map<String, Object>> maskedData = new ArrayList<>();
@@ -150,17 +130,17 @@ public class StaticDataMaskingService {
                 Boolean isActive = extractIsActive(rule);
                 
                 // 打印每条规则的应用过程
-                System.out.println("应用规则: 列名=" + columnName + ", 类型=" + maskingType);
+                logger.debug("应用规则: 列名={}, 类型={}", columnName, maskingType);
                 
                 // 检查规则是否激活
                 if (isActive != null && !isActive) {
-                    System.out.println("  规则未激活，跳过");
+                    logger.debug("  规则未激活，跳过");
                     continue;  // 跳过未激活的规则
                 }
                 
                 // 如果列名为null或空，跳过此规则
                 if (columnName == null || columnName.isEmpty()) {
-                    System.out.println("  列名为空，跳过规则");
+                    logger.debug("  列名为空，跳过规则");
                     continue;
                 }
                 
@@ -169,32 +149,32 @@ public class StaticDataMaskingService {
                 
                 // 检查是否找到匹配的列
                 if (matchedColumn == null) {
-                    System.out.println("  找不到匹配的列: " + columnName);
+                    logger.debug("  找不到匹配的列: {}", columnName);
                     continue;
                 }
                 
-                System.out.println("  找到匹配列: " + matchedColumn);
+                logger.debug("  找到匹配列: {}", matchedColumn);
                 
                 Object value = row.get(matchedColumn);
                 
                 // 只有当值不为null时才进行脱敏
                 if (value != null) {
-                    System.out.println("  原始值: " + value);
+                    logger.debug("  原始值: {}", value);
                     
                     Object maskedValue = applyMasking(value.toString(), maskingType, rule);
-                    System.out.println("  脱敏后值: " + maskedValue);
+                    logger.debug("  脱敏后值: {}", maskedValue);
                     
                     // 只有当脱敏后的值与原始值不同时才更新
                     if (!value.equals(maskedValue)) {
                         maskedRow.put(matchedColumn, maskedValue);
                         maskedFields++;
                         rowMasked = true;
-                        System.out.println("  值已更新");
+                        logger.debug("  值已更新");
                     } else {
-                        System.out.println("  值未变化，不更新");
+                        logger.debug("  值未变化，不更新");
                     }
                 } else {
-                    System.out.println("  值为null，不处理");
+                    logger.debug("  值为null，不处理");
                 }
             }
             
@@ -205,10 +185,10 @@ public class StaticDataMaskingService {
         }
         
         logger.info("完成脱敏处理，共处理{}条记录，{}个字段被脱敏", processedRows, maskedFields);
-        System.out.println("====== 脱敏处理结果 ======");
-        System.out.println("处理记录数: " + processedRows);
-        System.out.println("脱敏字段数: " + maskedFields);
-        System.out.println("=========================");
+        logger.debug("====== 脱敏处理结果 ======");
+        logger.debug("处理记录数: {}", processedRows);
+        logger.debug("脱敏字段数: {}", maskedFields);
+        logger.debug("=========================");
         
         return maskedData;
     }
@@ -539,12 +519,10 @@ public class StaticDataMaskingService {
      */
     public boolean createTableAndInsertData(String targetTable, List<Map<String, Object>> maskedData) {
         logger.info("开始创建目标表并插入脱敏数据, 目标表: {}, 数据量: {}", targetTable, maskedData.size());
-        System.out.println("开始创建目标表: " + targetTable + ", 数据量: " + (maskedData != null ? maskedData.size() : 0));
         
         try {
             if (maskedData == null || maskedData.isEmpty()) {
                 logger.warn("没有可插入的数据");
-                System.out.println("错误: 没有可插入的数据");
                 return false;
             }
             
@@ -568,14 +546,12 @@ public class StaticDataMaskingService {
             
             // 创建表
             logger.debug("执行创建表SQL: {}", sql);
-            System.out.println("执行创建表SQL: " + sql);
             
             try {
                 jdbcTemplate.execute(sql);
-                System.out.println("表创建成功: " + targetTable);
+                logger.info("表创建成功: {}", targetTable);
             } catch (Exception e) {
-                System.err.println("表创建失败: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("表创建失败: {}", e.getMessage(), e);
                 throw e;
             }
             
@@ -604,7 +580,6 @@ public class StaticDataMaskingService {
             
             // 批量插入数据
             logger.debug("执行插入数据SQL: {}", insertSqlStr);
-            System.out.println("执行插入数据SQL: " + insertSqlStr);
             int insertedCount = 0;
             
             try {
@@ -621,21 +596,17 @@ public class StaticDataMaskingService {
                     jdbcTemplate.update(insertSqlStr, params.toArray());
                     insertedCount++;
                 }
-                System.out.println("数据插入成功，共插入: " + insertedCount + "条记录");
+                logger.info("数据插入成功，共插入: {}条记录", insertedCount);
             } catch (Exception e) {
-                System.err.println("数据插入失败: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("数据插入失败: {}", e.getMessage(), e);
                 throw e;
             }
             
             logger.info("成功创建表并插入{}条数据到{}", maskedData.size(), targetTable);
-            System.out.println("成功创建表并插入" + maskedData.size() + "条数据到" + targetTable);
             return true;
             
         } catch (Exception e) {
             logger.error("创建表或插入数据失败: {}", e.getMessage(), e);
-            System.err.println("创建表或插入数据失败: " + e.getMessage());
-            e.printStackTrace();
             throw new RuntimeException("创建表或插入数据失败", e);
         }
     }
