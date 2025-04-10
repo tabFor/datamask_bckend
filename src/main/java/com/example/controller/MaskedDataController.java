@@ -3,9 +3,7 @@ package com.example.controller;
 import com.example.dto.ApiResponse;
 import com.example.service.DataMaskingService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,23 +44,58 @@ public class MaskedDataController {
             
             // 对敏感字段进行脱敏
             if (user.get("username") != null) {
-                maskedUser.put("username", dataMaskingService.maskUsername((String) user.get("username")));
+                maskedUser.put("username", dataMaskingService.maskValue(
+                    (String) user.get("username"),
+                    "username",
+                    null,
+                    1,
+                    1,
+                    "*"
+                ));
             }
             
             if (user.get("email") != null) {
-                maskedUser.put("email", dataMaskingService.maskEmail((String) user.get("email")));
+                maskedUser.put("email", dataMaskingService.maskValue(
+                    (String) user.get("email"),
+                    "email",
+                    null,
+                    1,
+                    1,
+                    "*"
+                ));
             }
             
             if (user.get("phone") != null) {
-                maskedUser.put("phone", dataMaskingService.maskPhone((String) user.get("phone")));
+                maskedUser.put("phone", dataMaskingService.maskValue(
+                    (String) user.get("phone"),
+                    "phone",
+                    null,
+                    3,
+                    4,
+                    "*"
+                ));
             }
             
             if (user.get("idCard") != null) {
-                maskedUser.put("idCard", dataMaskingService.maskIdCard((String) user.get("idCard")));
+                maskedUser.put("idCard", dataMaskingService.maskValue(
+                    (String) user.get("idCard"),
+                    "idCard",
+                    null,
+                    6,
+                    4,
+                    "*"
+                ));
             }
             
             if (user.get("address") != null) {
-                maskedUser.put("address", dataMaskingService.maskAddress((String) user.get("address")));
+                maskedUser.put("address", dataMaskingService.maskValue(
+                    (String) user.get("address"),
+                    "address",
+                    null,
+                    5,
+                    5,
+                    "*"
+                ));
             }
             
             maskedUsers.add(maskedUser);
@@ -95,15 +128,36 @@ public class MaskedDataController {
             
             // 对敏感字段进行脱敏
             if (order.get("receiverName") != null) {
-                maskedOrder.put("receiverName", dataMaskingService.maskUsername((String) order.get("receiverName")));
+                maskedOrder.put("receiverName", dataMaskingService.maskValue(
+                    (String) order.get("receiverName"),
+                    "username",
+                    null,
+                    1,
+                    1,
+                    "*"
+                ));
             }
             
             if (order.get("receiverPhone") != null) {
-                maskedOrder.put("receiverPhone", dataMaskingService.maskPhone((String) order.get("receiverPhone")));
+                maskedOrder.put("receiverPhone", dataMaskingService.maskValue(
+                    (String) order.get("receiverPhone"),
+                    "phone",
+                    null,
+                    3,
+                    4,
+                    "*"
+                ));
             }
             
             if (order.get("receiverAddress") != null) {
-                maskedOrder.put("receiverAddress", dataMaskingService.maskAddress((String) order.get("receiverAddress")));
+                maskedOrder.put("receiverAddress", dataMaskingService.maskValue(
+                    (String) order.get("receiverAddress"),
+                    "address",
+                    null,
+                    5,
+                    5,
+                    "*"
+                ));
             }
             
             maskedOrders.add(maskedOrder);

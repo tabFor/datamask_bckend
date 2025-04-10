@@ -1,6 +1,7 @@
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/utils/RedisUtils.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/repository/MedicalRecordRepository.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/util/DataMaskingUtil.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/model/MaskingFact.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/impl/DesensitizationRuleServiceImpl.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/repository/EmployeeDataRepository.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/model/EmployeeData.java
@@ -39,6 +40,7 @@
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/util/LogUtils.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/interceptor/SQLMaskingInterceptor.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/impl/UserServiceImpl.java
+/Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/config/DroolsConfig.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/RuleController.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/service/TaskService.java
 /Users/yangzhijie/Library/CloudStorage/OneDrive-个人/Graduation project/demo/src/main/java/com/example/controller/AuditLogController.java
