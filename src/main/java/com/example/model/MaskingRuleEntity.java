@@ -81,7 +81,7 @@ public class MaskingRuleEntity {
     public void setMaskingType(String maskingType) {
         this.maskingType = maskingType;
     }
-
+    
     public boolean isActive() {
         return active;
     }

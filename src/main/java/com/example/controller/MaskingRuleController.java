@@ -2,6 +2,13 @@ package com.example.controller;
 
 import com.example.model.MaskingRuleEntity;
 import com.example.service.MaskingRuleService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +21,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/masking-rules")
+@Tag(name = "脱敏规则管理", description = "提供脱敏规则的创建、查询、更新和删除功能")
 public class MaskingRuleController {
     
     private static final Logger logger = LoggerFactory.getLogger(MaskingRuleController.class);
@@ -25,6 +33,16 @@ public class MaskingRuleController {
         this.maskingRuleService = maskingRuleService;
     }
     
+    @Operation(
+        summary = "获取所有脱敏规则", 
+        description = "获取系统中配置的所有脱敏规则"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "成功获取规则列表"
+        )
+    })
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllRules() {
         List<MaskingRuleEntity> rules = maskingRuleService.getAllRules();
@@ -36,6 +54,16 @@ public class MaskingRuleController {
         return ResponseEntity.ok(response);
     }
     
+    @Operation(
+        summary = "获取活跃的脱敏规则", 
+        description = "获取当前处于活跃状态的脱敏规则"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "成功获取活跃规则列表"
+        )
+    })
     @GetMapping("/active")
     public ResponseEntity<Map<String, Object>> getActiveRules() {
         List<MaskingRuleEntity> rules = maskingRuleService.getActiveRules();
@@ -47,6 +75,20 @@ public class MaskingRuleController {
         return ResponseEntity.ok(response);
     }
     
+    @Operation(
+        summary = "保存脱敏规则", 
+        description = "创建或更新脱敏规则"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "规则保存成功"
+        ),
+        @ApiResponse(
+            responseCode = "400", 
+            description = "请求参数错误"
+        )
+    })
     @PostMapping
     public ResponseEntity<Map<String, Object>> saveRule(@RequestBody Object rawRequest) {
         Map<String, Object> response = new HashMap<>();
@@ -183,6 +225,20 @@ public class MaskingRuleController {
         return entity;
     }
     
+    @Operation(
+        summary = "删除脱敏规则", 
+        description = "根据ID删除指定的脱敏规则"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "规则删除成功"
+        ),
+        @ApiResponse(
+            responseCode = "404", 
+            description = "规则不存在"
+        )
+    })
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteRule(@PathVariable Long id) {
         maskingRuleService.deleteRule(id);
@@ -194,10 +250,24 @@ public class MaskingRuleController {
         return ResponseEntity.ok(response);
     }
     
+    @Operation(
+        summary = "更新规则状态", 
+        description = "更新指定规则的活动状态"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "状态更新成功"
+        ),
+        @ApiResponse(
+            responseCode = "404", 
+            description = "规则不存在"
+        )
+    })
     @PutMapping("/{id}/status")
     public ResponseEntity<Map<String, Object>> updateRuleStatus(
-            @PathVariable Long id,
-            @RequestParam boolean active) {
+            @Parameter(description = "规则ID") @PathVariable Long id,
+            @Parameter(description = "是否激活") @RequestParam boolean active) {
         maskingRuleService.updateRuleStatus(id, active);
         
         Map<String, Object> response = new HashMap<>();
@@ -207,6 +277,20 @@ public class MaskingRuleController {
         return ResponseEntity.ok(response);
     }
     
+    @Operation(
+        summary = "批量保存规则", 
+        description = "批量创建或更新多个脱敏规则"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "批量保存成功"
+        ),
+        @ApiResponse(
+            responseCode = "400", 
+            description = "请求参数错误"
+        )
+    })
     @PostMapping("/batch")
     public ResponseEntity<Map<String, Object>> saveBatchRules(@RequestBody List<MaskingRuleEntity> rules) {
         Map<String, Object> response = new HashMap<>();
@@ -268,6 +352,20 @@ public class MaskingRuleController {
         }
     }
     
+    @Operation(
+        summary = "批量保存包装规则", 
+        description = "批量保存包装格式的脱敏规则"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "批量保存成功"
+        ),
+        @ApiResponse(
+            responseCode = "400", 
+            description = "请求参数错误"
+        )
+    })
     @PostMapping("/batch-wrapped")
     public ResponseEntity<Map<String, Object>> saveBatchWrappedRules(@RequestBody Map<String, Object> request) {
         Map<String, Object> response = new HashMap<>();
@@ -287,7 +385,7 @@ public class MaskingRuleController {
                 MaskingRuleEntity rule = new MaskingRuleEntity();
                 
                 // 设置ID（如果有）
-                if (ruleData.containsKey("id")) {
+                if (ruleData.containsKey("id") && ruleData.get("id") != null) {
                     rule.setId(((Number) ruleData.get("id")).longValue());
                 }
                 
@@ -365,6 +463,16 @@ public class MaskingRuleController {
         }
     }
     
+    @Operation(
+        summary = "刷新规则缓存", 
+        description = "刷新脱敏规则的缓存数据"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "缓存刷新成功"
+        )
+    })
     @PostMapping("/refresh")
     public ResponseEntity<Map<String, Object>> refreshRules() {
         Map<String, Object> response = new HashMap<>();

@@ -61,6 +61,15 @@ public class Task {
     
     @Column(columnDefinition = "TEXT")
     private String columnMappings;  // 存储列名和规则ID的映射关系，格式为JSON: {"column1": "ruleId1", "column2": "ruleId2"}
+    
+    @Column
+    private Boolean usePresidio;  // 标记是否使用Presidio进行脱敏
+    
+    @Column
+    private Boolean autoDetectColumns; // 是否自动识别敏感列
+    
+    @Column(columnDefinition = "TEXT")
+    private String detectedColumns; // 存储识别到的敏感列信息，JSON格式
 
     // Getters and Setters
     public Long getId() {
@@ -197,5 +206,29 @@ public class Task {
 
     public void setColumnMappings(String columnMappings) {
         this.columnMappings = columnMappings;
+    }
+    
+    public Boolean getUsePresidio() {
+        return usePresidio;
+    }
+
+    public void setUsePresidio(Boolean usePresidio) {
+        this.usePresidio = usePresidio;
+    }
+    
+    public Boolean getAutoDetectColumns() {
+        return autoDetectColumns;
+    }
+
+    public void setAutoDetectColumns(Boolean autoDetectColumns) {
+        this.autoDetectColumns = autoDetectColumns;
+    }
+    
+    public String getDetectedColumns() {
+        return detectedColumns;
+    }
+
+    public void setDetectedColumns(String detectedColumns) {
+        this.detectedColumns = detectedColumns;
     }
 } 

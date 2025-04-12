@@ -150,6 +150,9 @@ public class TaskController {
             taskDTO.setOutputLocation(task.getOutputLocation());
             taskDTO.setOutputTable(task.getOutputTable());
             
+            // 设置是否使用Presidio进行脱敏
+            taskDTO.setUsePresidio(task.getUsePresidio());
+            
             // 设置脱敏规则和列名映射
             try {
                 if (task.getMaskingRules() != null) {
@@ -366,6 +369,9 @@ public class TaskController {
         if (task.getOutputTable() != null) {
             map.put("outputTable", task.getOutputTable());
         }
+        
+        // 添加使用Presidio标记
+        map.put("usePresidio", task.getUsePresidio() != null ? task.getUsePresidio() : false);
         
         // 根据需要添加其他字段
         if (task.getExecuteTime() != null) {

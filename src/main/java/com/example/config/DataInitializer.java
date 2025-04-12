@@ -32,6 +32,12 @@ public class DataInitializer implements CommandLineRunner {
             // 临时关闭外键约束检查
             jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
             
+            // 移除数据库表中的masking_mode列
+            executeScript("db/remove-masking-mode.sql");
+            
+            // 添加自动识别敏感列相关字段
+            executeScript("db/add-auto-detect-columns.sql");
+            
             // 初始化测试数据
             executeScript("db/init-test-data.sql");
             

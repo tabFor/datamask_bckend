@@ -5,8 +5,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.stereotype.Service;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.Statement;
 import java.util.*;
 
 /**
@@ -23,6 +29,9 @@ public class StaticDataMaskingService {
     
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    
+    @Autowired
+    private PresidioService presidioService;
     
     /**
      * 根据规则ID列表获取脱敏规则
@@ -264,10 +273,13 @@ public class StaticDataMaskingService {
     /**
      * 应用脱敏规则
      */
-    private Object applyMasking(String value, String maskingType, Map<String, Object> rule) {
+    public Object applyMasking(String value, String maskingType, Map<String, Object> rule) {
         if (value == null || maskingType == null) {
             return value;
         }
+        
+        // 使用内置脱敏规则处理
+        logger.debug("使用内置脱敏规则处理");
         
         // 获取规则参数
         Integer prefixLength = null;
@@ -615,7 +627,7 @@ public class StaticDataMaskingService {
      * 查询原始数据
      */
     public List<Map<String, Object>> queryOriginalData(String sourceDatabase, String sourceTables) {
-        logger.info("开始查询原始数据，数据库: {}，表: {}", sourceDatabase, sourceTables);
+        logger.info("开始查询原始数据，数据库信息: {}，表: {}", sourceDatabase, sourceTables);
         
         try {
             // 解析表名
@@ -628,23 +640,145 @@ public class StaticDataMaskingService {
             String tableName = tables[0].trim(); // 暂时只处理第一个表
             logger.info("准备查询表: {}", tableName);
             
-            // 构建SQL查询
-            String sql = "SELECT * FROM " + tableName;
+            // 解析数据库连接信息
+            Map<String, String> dbInfo = parseSourceDatabase(sourceDatabase);
+            String dbType = dbInfo.getOrDefault("类型", "mysql").toLowerCase();
+            String host = dbInfo.getOrDefault("主机", "localhost");
+            String port = dbInfo.getOrDefault("端口", "3306");
+            String dbName = dbInfo.getOrDefault("数据库", "");
+            String username = dbInfo.getOrDefault("用户名", "");
+            String password = dbInfo.getOrDefault("密码", "");
+            
+            logger.info("数据库类型: {}, 主机: {}, 端口: {}, 数据库名: {}", dbType, host, port, dbName);
+            
+            // 获取自定义数据源连接
+            Connection connection = getCustomDatabaseConnection(dbType, host, port, dbName, username, password);
+            
+            // 根据数据库类型构建SQL查询
+            String sql = buildQuerySql(dbType, tableName);
             logger.debug("执行SQL: {}", sql);
             
             try {
-                // 使用JdbcTemplate查询数据
-                List<Map<String, Object>> result = jdbcTemplate.queryForList(sql);
+                // 执行查询
+                List<Map<String, Object>> result = executeQuery(connection, sql);
                 logger.info("查询到{}条数据", result.size());
                 return result;
             } catch (Exception e) {
                 logger.error("执行SQL查询失败: {}", e.getMessage(), e);
                 return generateMockData(); // 查询失败时返回模拟数据
+            } finally {
+                // 关闭连接
+                if (connection != null && !connection.isClosed()) {
+                    connection.close();
+                    logger.debug("数据库连接已关闭");
+                }
             }
         } catch (Exception e) {
             logger.error("查询原始数据失败: {}", e.getMessage(), e);
             return generateMockData(); // 失败时返回模拟数据
         }
+    }
+    
+    /**
+     * 解析数据库连接信息字符串
+     */
+    private Map<String, String> parseSourceDatabase(String sourceDatabase) {
+        Map<String, String> dbInfo = new HashMap<>();
+        
+        if (sourceDatabase == null || sourceDatabase.trim().isEmpty()) {
+            return dbInfo;
+        }
+        
+        // 解析格式: "类型:mysql;主机:localhost;端口:3306;数据库:test;用户名:root;密码:123456"
+        String[] parts = sourceDatabase.split(";");
+        for (String part : parts) {
+            String[] keyValue = part.split(":", 2);
+            if (keyValue.length == 2) {
+                dbInfo.put(keyValue[0].trim(), keyValue[1].trim());
+            }
+        }
+        
+        return dbInfo;
+    }
+    
+    /**
+     * 获取自定义数据库连接
+     */
+    private Connection getCustomDatabaseConnection(String dbType, String host, String port, String dbName, String username, String password) throws Exception {
+        String url;
+        
+        switch (dbType.toLowerCase()) {
+            case "mysql":
+                url = "jdbc:mysql://" + host + ":" + port + "/" + dbName + "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+                Class.forName("com.mysql.cj.jdbc.Driver");
+                break;
+            case "postgresql":
+                url = "jdbc:postgresql://" + host + ":" + port + "/" + dbName;
+                Class.forName("org.postgresql.Driver");
+                break;
+            case "oracle":
+                url = "jdbc:oracle:thin:@" + host + ":" + port + ":" + dbName;
+                Class.forName("oracle.jdbc.OracleDriver");
+                break;
+            case "sqlserver":
+                url = "jdbc:sqlserver://" + host + ":" + port + ";databaseName=" + dbName;
+                Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
+                break;
+            default:
+                throw new IllegalArgumentException("不支持的数据库类型: " + dbType);
+        }
+        
+        logger.debug("尝试连接数据库: {}", url);
+        return DriverManager.getConnection(url, username, password);
+    }
+    
+    /**
+     * 根据数据库类型构建查询SQL
+     */
+    private String buildQuerySql(String dbType, String tableName) {
+        // 根据不同的数据库类型生成不同的SQL语句
+        switch (dbType.toLowerCase()) {
+            case "mysql":
+            case "postgresql":
+                return "SELECT * FROM " + tableName;
+            case "oracle":
+                return "SELECT * FROM " + tableName.toUpperCase();
+            case "sqlserver":
+                return "SELECT * FROM [" + tableName + "]";
+            default:
+                return "SELECT * FROM " + tableName;
+        }
+    }
+    
+    /**
+     * 执行SQL查询并将结果转换为List<Map<String, Object>>格式
+     */
+    private List<Map<String, Object>> executeQuery(Connection conn, String sql) throws Exception {
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            ResultSetMetaData metaData = rs.getMetaData();
+            int columnCount = metaData.getColumnCount();
+            
+            // 获取列名
+            List<String> columnNames = new ArrayList<>();
+            for (int i = 1; i <= columnCount; i++) {
+                columnNames.add(metaData.getColumnName(i));
+            }
+            
+            // 处理结果集
+            while (rs.next()) {
+                Map<String, Object> row = new HashMap<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    row.put(columnNames.get(i-1), rs.getObject(i));
+                }
+                resultList.add(row);
+            }
+        }
+        
+        return resultList;
     }
     
     /**

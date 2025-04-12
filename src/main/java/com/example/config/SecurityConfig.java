@@ -31,7 +31,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/check-auth", "/api/check-login").permitAll() // 验证登录状态接口允许匿名访问
                         .requestMatchers("/api/test-data/**").permitAll() // 测试数据接口允许匿名访问
                         .requestMatchers("/api/masking-rules/active").permitAll() // 脱敏规则接口允许匿名访问
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll() // Swagger 文档允许匿名访问
+                        
+                        // Swagger 相关路径允许匿名访问
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/swagger-ui/index.html").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
                         
                         // 明确允许任何认证用户访问的接口
                         .requestMatchers("/api/dynamic/masking/**").authenticated() // 动态脱敏接口允许任何已认证用户访问

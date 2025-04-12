@@ -5,6 +5,7 @@ import com.example.dto.TaskDTO;
 import com.example.model.Task;
 import com.example.repository.TaskRepository;
 import com.example.service.DesensitizationRuleService;
+import com.example.service.PresidioService;
 import com.example.service.StaticDataMaskingService;
 import com.example.service.TaskService;
 import com.example.utils.RedisUtils;
@@ -31,6 +32,8 @@ import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import com.example.model.SensitiveColumn;
+import com.example.service.SensitiveDataDetector;
 
 @Service
 public class TaskServiceImpl implements TaskService {
@@ -59,6 +62,12 @@ public class TaskServiceImpl implements TaskService {
 
     @Autowired
     private RedisUtils redisUtils;
+    
+    @Autowired
+    private PresidioService presidioService;
+
+    @Autowired
+    private SensitiveDataDetector sensitiveDataDetector;
 
     @Override
     public Page<Task> findTasks(int page, int pageSize, String keyword) {
@@ -141,6 +150,15 @@ public class TaskServiceImpl implements TaskService {
             sourceDbBuilder.append("主机:").append(taskDTO.getHost()).append(";");
             sourceDbBuilder.append("端口:").append(taskDTO.getPort()).append(";");
             sourceDbBuilder.append("数据库:").append(taskDTO.getDbName());
+            
+            // 添加数据库用户名和密码
+            if (taskDTO.getUsername() != null) {
+                sourceDbBuilder.append(";用户名:").append(taskDTO.getUsername());
+            }
+            if (taskDTO.getPassword() != null) {
+                sourceDbBuilder.append(";密码:").append(taskDTO.getPassword());
+            }
+            
             task.setSourceDatabase(sourceDbBuilder.toString());
         } else if (taskDTO.getSourceDatabase() != null) {
             task.setSourceDatabase(taskDTO.getSourceDatabase());
@@ -164,6 +182,25 @@ public class TaskServiceImpl implements TaskService {
         
         if (taskDTO.getOutputTable() != null) {
             task.setOutputTable(taskDTO.getOutputTable());
+        }
+        
+        // 设置是否使用Presidio进行脱敏
+        if (taskDTO.getUsePresidio() != null) {
+            task.setUsePresidio(taskDTO.getUsePresidio());
+        } else {
+            task.setUsePresidio(false);  // 默认不使用Presidio
+        }
+        
+        // 设置是否自动识别敏感列
+        if (taskDTO.getAutoDetectColumns() != null) {
+            task.setAutoDetectColumns(taskDTO.getAutoDetectColumns());
+        } else {
+            task.setAutoDetectColumns(false);  // 默认不自动识别
+        }
+        
+        // 设置识别到的敏感列信息
+        if (taskDTO.getDetectedColumns() != null) {
+            task.setDetectedColumns(taskDTO.getDetectedColumns());
         }
         
         // 处理脱敏规则
@@ -290,25 +327,56 @@ public class TaskServiceImpl implements TaskService {
     public Task updateTask(Long id, TaskDTO taskDTO) {
         Task task = findTaskById(id);
         
-        if ("进行中".equals(task.getStatus())) {
-            throw new RuntimeException("任务执行中，无法更新");
+        if (task == null) {
+            throw new RuntimeException("任务不存在");
         }
         
-        // 更新任务基本信息
+        // 检查任务状态，只有等待中的任务可以更新
+        if (!"等待中".equals(task.getStatus())) {
+            throw new RuntimeException("只有等待中的任务可以更新");
+        }
+        
+        // 更新任务信息
         if (taskDTO.getTaskName() != null) {
             task.setTaskName(taskDTO.getTaskName());
         }
         
-        // 更新任务描述
         if (taskDTO.getDescription() != null) {
             task.setTaskDescription(taskDTO.getDescription());
         } else if (taskDTO.getTaskDescription() != null) {
             task.setTaskDescription(taskDTO.getTaskDescription());
         }
         
-        // 更新优先级
         if (taskDTO.getPriority() != null) {
             task.setPriority(taskDTO.getPriority());
+        }
+        
+        // 更新数据源信息
+        if (taskDTO.getSourceDatabase() != null) {
+            task.setSourceDatabase(taskDTO.getSourceDatabase());
+        } else if (taskDTO.getDbType() != null) {
+            StringBuilder sourceDbBuilder = new StringBuilder();
+            sourceDbBuilder.append("类型:").append(taskDTO.getDbType()).append(";");
+            sourceDbBuilder.append("主机:").append(taskDTO.getHost()).append(";");
+            sourceDbBuilder.append("端口:").append(taskDTO.getPort()).append(";");
+            sourceDbBuilder.append("数据库:").append(taskDTO.getDbName());
+            
+            // 添加数据库用户名和密码
+            if (taskDTO.getUsername() != null) {
+                sourceDbBuilder.append(";用户名:").append(taskDTO.getUsername());
+            }
+            if (taskDTO.getPassword() != null) {
+                sourceDbBuilder.append(";密码:").append(taskDTO.getPassword());
+            }
+            
+            task.setSourceDatabase(sourceDbBuilder.toString());
+        }
+        
+        // 更新表名
+        if (taskDTO.getSourceTables() != null) {
+            task.setSourceTables(taskDTO.getSourceTables());
+        } else if (taskDTO.getTableName() != null) {
+            task.setSourceTables(taskDTO.getTableName());
         }
         
         // 更新输出配置
@@ -322,6 +390,21 @@ public class TaskServiceImpl implements TaskService {
         
         if (taskDTO.getOutputTable() != null) {
             task.setOutputTable(taskDTO.getOutputTable());
+        }
+        
+        // 更新是否使用Presidio
+        if (taskDTO.getUsePresidio() != null) {
+            task.setUsePresidio(taskDTO.getUsePresidio());
+        }
+        
+        // 更新是否自动识别敏感列
+        if (taskDTO.getAutoDetectColumns() != null) {
+            task.setAutoDetectColumns(taskDTO.getAutoDetectColumns());
+        }
+        
+        // 更新识别到的敏感列信息
+        if (taskDTO.getDetectedColumns() != null) {
+            task.setDetectedColumns(taskDTO.getDetectedColumns());
         }
         
         // 处理脱敏规则
@@ -359,167 +442,193 @@ public class TaskServiceImpl implements TaskService {
         try {
             logger.info("执行脱敏任务, 任务ID: {}, 任务名称: {}", task.getId(), task.getTaskName());
             
-            // 获取任务的脱敏规则
-            String maskingRulesJson = task.getMaskingRules();
-            if (maskingRulesJson == null || maskingRulesJson.isEmpty()) {
-                logger.warn("任务脱敏规则为空, 任务ID: {}", task.getId());
-                throw new RuntimeException("任务脱敏规则为空");
-            }
+            // 解析数据源信息
+            String sourceDatabase = task.getSourceDatabase();
+            String sourceTables = task.getSourceTables();
+            logger.debug("数据源信息: 数据库={}, 表={}", sourceDatabase, sourceTables);
             
-            // 获取列名与规则ID的映射关系
-            String columnMappingsJson = task.getColumnMappings();
-            Map<String, String> columnToRuleMap = new HashMap<>();
+            // 获取原始数据
+            List<Map<String, Object>> originalData = staticDataMaskingService.queryOriginalData(sourceDatabase, sourceTables);
             
-            if (columnMappingsJson != null && !columnMappingsJson.isEmpty()) {
-                try {
-                    columnToRuleMap = objectMapper.readValue(columnMappingsJson, new TypeReference<Map<String, String>>() {});
-                    logger.debug("成功解析列名映射: {}", columnToRuleMap);
-                } catch (Exception e) {
-                    logger.warn("解析列名映射失败: {}", e.getMessage());
-                    // 解析失败不影响后续处理，使用空映射继续
+            // 记录开始处理
+            task.setExecutionLog("开始执行脱敏任务，处理表: " + sourceTables);
+            taskRepository.save(task);
+            
+            List<Map<String, Object>> maskedData;
+            
+            // 判断是否使用Presidio进行脱敏
+            if (task.getUsePresidio() != null && task.getUsePresidio()) {
+                logger.info("使用Presidio进行敏感数据识别和脱敏");
+                task.setExecutionLog(task.getExecutionLog() + "\n使用Presidio进行敏感数据识别和脱敏");
+                
+                // 检查是否需要自动识别敏感列
+                if (task.getAutoDetectColumns() != null && task.getAutoDetectColumns()) {
+                    logger.info("使用Presidio自动识别敏感列");
+                    task.setExecutionLog(task.getExecutionLog() + "\n开始使用Presidio自动识别敏感列...");
+                    
+                    try {
+                        // 执行敏感列自动识别
+                        List<SensitiveColumn> detectedColumns = sensitiveDataDetector.detectSensitiveColumnsWithPresidio(sourceTables);
+                        
+                        if (detectedColumns != null && !detectedColumns.isEmpty()) {
+                            logger.info("Presidio自动识别出{}个敏感列", detectedColumns.size());
+                            
+                            // 将识别结果转换为JSON并保存
+                            String detectedColumnsJson = objectMapper.writeValueAsString(detectedColumns);
+                            task.setDetectedColumns(detectedColumnsJson);
+                            
+                            // 构建识别结果日志
+                            StringBuilder columnLog = new StringBuilder();
+                            columnLog.append("\nPresidio识别出").append(detectedColumns.size()).append("个敏感列：");
+                            
+                            for (SensitiveColumn column : detectedColumns) {
+                                columnLog.append("\n  - ").append(column.getColumnName())
+                                         .append("（类型：").append(column.getSensitiveType()).append("）");
+                            }
+                            
+                            task.setExecutionLog(task.getExecutionLog() + columnLog.toString());
+                            logger.debug(columnLog.toString());
+                        } else {
+                            logger.info("Presidio未识别出任何敏感列");
+                            task.setExecutionLog(task.getExecutionLog() + "\nPresidio未识别出任何敏感列");
+                        }
+                    } catch (Exception e) {
+                        logger.error("Presidio自动识别敏感列失败: {}", e.getMessage(), e);
+                        task.setExecutionLog(task.getExecutionLog() + "\nPresidio自动识别敏感列失败: " + e.getMessage());
+                    }
+                    
+                    // 保存任务状态
+                    taskRepository.save(task);
                 }
+                
+                // 使用Presidio处理数据
+                maskedData = processMaskedDataWithPresidio(originalData);
+                logger.debug("成功获取Presidio脱敏后数据, 共 {} 条记录", maskedData.size());
             } else {
-                logger.debug("列名映射为空，将使用规则中的列名");
-            }
-            
-            // 解析脱敏规则
-            List<String> ruleIds;
-            try {
-                // 首先尝试解析为规则ID列表(字符串数组)
+                // 使用原有脱敏规则处理
+                logger.info("使用配置的脱敏规则进行处理");
+                
+                // 获取任务的脱敏规则
+                String maskingRulesJson = task.getMaskingRules();
+                if (maskingRulesJson == null || maskingRulesJson.isEmpty()) {
+                    logger.warn("任务脱敏规则为空, 任务ID: {}", task.getId());
+                    throw new RuntimeException("任务脱敏规则为空");
+                }
+                
+                // 获取列名与规则ID的映射关系
+                String columnMappingsJson = task.getColumnMappings();
+                Map<String, String> columnToRuleMap = new HashMap<>();
+                
+                if (columnMappingsJson != null && !columnMappingsJson.isEmpty()) {
+                    try {
+                        columnToRuleMap = objectMapper.readValue(columnMappingsJson, new TypeReference<Map<String, String>>() {});
+                        logger.debug("成功解析列名映射: {}", columnToRuleMap);
+                    } catch (Exception e) {
+                        logger.warn("解析列名映射失败: {}", e.getMessage());
+                        // 解析失败不影响后续处理，使用空映射继续
+                    }
+                } else {
+                    logger.debug("列名映射为空，将使用规则中的列名");
+                }
+                
+                // 解析脱敏规则
+                List<String> ruleIds;
                 try {
-                    ruleIds = objectMapper.readValue(maskingRulesJson, new TypeReference<List<String>>() {});
-                    logger.debug("解析为规则ID列表，ID数量: {}", ruleIds.size());
-                    
-                    // 添加详细输出 - 打印每个规则ID
-                    logger.debug("======== 规则ID详情 ========");
-                    for (int i = 0; i < ruleIds.size(); i++) {
-                        logger.debug("规则ID[{}]': {}", i, ruleIds.get(i));
-                    }
-                    logger.debug("==========================");
-                } catch (Exception e) {
-                    // 如果解析为ID列表失败，尝试解析为MaskingRuleDTO列表
-                    logger.debug("尝试解析为MaskingRuleDTO列表...");
-                    logger.debug("解析失败原因: {}", e.getMessage());
-                    logger.debug("原始JSON字符串: {}", maskingRulesJson);
-                    
-                    List<MaskingRuleDTO> ruleDTOs = objectMapper.readValue(maskingRulesJson, new TypeReference<List<MaskingRuleDTO>>() {});
-                    
-                    // 确保所有规则都是激活状态
-                    for (MaskingRuleDTO dto : ruleDTOs) {
-                        dto.setActive(true);
-                        logger.debug("设置规则为激活状态: {}, 激活状态: {}", dto.getRuleId(), dto.isActive());
-                    }
-                    
-                    // 添加详细输出 - 打印解析出的DTO对象
-                    logger.debug("======== 解析出的MaskingRuleDTO详情 ========");
-                    for (int i = 0; i < ruleDTOs.size(); i++) {
-                        MaskingRuleDTO dto = ruleDTOs.get(i);
-                        logger.debug("规则DTO[{}] {}", i, dto);
-                        logger.debug("  - RuleId: '{}'", dto.getRuleId());
-                        logger.debug("  - 类型: {}", dto.getMaskingType());
-                        logger.debug("  - 列名: {}", dto.getColumnName());
-                        logger.debug("  - 数据库: {}", dto.getDatabase());
-                        logger.debug("  - 表名: {}", dto.getTableName());
-                    }
-                    logger.debug("=======================================");
-                    
-                    // 提取ruleId属性组成ruleIds列表
-                    ruleIds = ruleDTOs.stream()
+                    // 尝试直接解析为规则ID列表（字符串格式）
+                    try {
+                        ruleIds = Arrays.asList(objectMapper.readValue(maskingRulesJson, String[].class));
+                    } catch (Exception e) {
+                        // 如果不是简单的字符串列表，尝试解析为MaskingRuleDTO列表
+                        List<MaskingRuleDTO> maskingRuleDTOs = objectMapper.readValue(
+                            maskingRulesJson, 
+                            new TypeReference<List<MaskingRuleDTO>>() {}
+                        );
+                        
+                        // 提取规则ID
+                        ruleIds = maskingRuleDTOs.stream()
                             .map(MaskingRuleDTO::getRuleId)
                             .filter(id -> id != null && !id.isEmpty())
                             .collect(Collectors.toList());
-                    
-                    logger.debug("从MaskingRuleDTO列表中提取规则ID，ID数量: {}", ruleIds.size());
-                    
-                    // 添加详细输出 - 打印提取的规则ID
-                    logger.debug("======== 提取的规则ID详情 ========");
-                    for (int i = 0; i < ruleIds.size(); i++) {
-                        logger.debug("提取规则ID[{}]': {}", i, ruleIds.get(i));
                     }
-                    logger.debug("================================");
-                    
-                    // 如果没有有效的ruleId，则抛出异常
-                    if (ruleIds.isEmpty()) {
-                        throw new RuntimeException("没有找到有效的规则ID");
-                    }
-                }
-            } catch (Exception e) {
-                logger.error("解析脱敏规则失败: {}", e.getMessage());
-                e.printStackTrace();
-                throw new RuntimeException("无法解析脱敏规则", e);
-            }
-            
-            // 通过StaticDataMaskingService获取规则
-            logger.debug("开始通过StaticDataMaskingService获取规则，规则ID数量: {}", ruleIds.size());
-            List<Map<String, Object>> maskingRules = staticDataMaskingService.getRulesByIds(ruleIds);
-            
-            logger.debug("脱敏配置解析完成, 规则数量: {}", maskingRules.size());
-            
-            // 如果有列名映射，则需要修改规则中的列名
-            if (!columnToRuleMap.isEmpty() && !maskingRules.isEmpty()) {
-                logger.debug("====== 应用列名映射 ======");
-                
-                // 创建规则ID到规则对象的映射，方便后续查找
-                Map<String, Map<String, Object>> ruleIdToRuleMap = new HashMap<>();
-                for (Map<String, Object> rule : maskingRules) {
-                    if (rule.containsKey("ruleId")) {
-                        ruleIdToRuleMap.put(rule.get("ruleId").toString(), rule);
-                    }
+                } catch (Exception e) {
+                    logger.error("解析脱敏规则失败: {}", e.getMessage());
+                    e.printStackTrace();
+                    throw new RuntimeException("无法解析脱敏规则", e);
                 }
                 
-                // 根据列名映射创建新的规则列表
-                List<Map<String, Object>> mappedRules = new ArrayList<>();
+                // 通过StaticDataMaskingService获取规则
+                logger.debug("开始通过StaticDataMaskingService获取规则，规则ID数量: {}", ruleIds.size());
+                List<Map<String, Object>> maskingRules = staticDataMaskingService.getRulesByIds(ruleIds);
                 
-                for (Map.Entry<String, String> entry : columnToRuleMap.entrySet()) {
-                    String columnName = entry.getKey();      // 数据表的列名
-                    String ruleId = entry.getValue();        // 对应的规则ID
+                logger.debug("脱敏配置解析完成, 规则数量: {}", maskingRules.size());
+                
+                // 如果有列名映射，则需要修改规则中的列名
+                if (!columnToRuleMap.isEmpty() && !maskingRules.isEmpty()) {
+                    logger.debug("====== 应用列名映射 ======");
                     
-                    logger.debug("映射列名: {} -> 规则ID: {}", columnName, ruleId);
+                    // 创建规则ID到规则对象的映射，方便后续查找
+                    Map<String, Map<String, Object>> ruleIdToRuleMap = new HashMap<>();
+                    for (Map<String, Object> rule : maskingRules) {
+                        if (rule.containsKey("ruleId")) {
+                            ruleIdToRuleMap.put(rule.get("ruleId").toString(), rule);
+                        }
+                    }
                     
-                    // 从规则映射中获取对应的规则
-                    Map<String, Object> rule = ruleIdToRuleMap.get(ruleId);
+                    // 根据列名映射创建新的规则列表
+                    List<Map<String, Object>> mappedRules = new ArrayList<>();
                     
-                    if (rule != null) {
-                        // 创建规则副本，避免修改原始规则
-                        Map<String, Object> mappedRule = new HashMap<>(rule);
-                        // 设置正确的列名
-                        mappedRule.put("columnName", columnName);
+                    for (Map.Entry<String, String> entry : columnToRuleMap.entrySet()) {
+                        String columnName = entry.getKey();
+                        String ruleId = entry.getValue();
                         
-                        logger.debug("创建映射规则: 列名={}, 规则类型={}", columnName, mappedRule.get("type"));
-                        mappedRules.add(mappedRule);
-                    } else {
-                        logger.warn("警告: 找不到规则ID: {}", ruleId);
+                        if (ruleIdToRuleMap.containsKey(ruleId)) {
+                            Map<String, Object> originalRule = ruleIdToRuleMap.get(ruleId);
+                            
+                            // 创建规则的克隆，避免修改原始规则
+                            Map<String, Object> clonedRule = new HashMap<>(originalRule);
+                            
+                            // 设置列名
+                            clonedRule.put("columnName", columnName);
+                            
+                            mappedRules.add(clonedRule);
+                            logger.debug("映射列名 {} 到规则 {}", columnName, ruleId);
+                        } else {
+                            logger.warn("映射的规则ID {} 不存在，忽略列 {}", ruleId, columnName);
+                        }
+                    }
+                    
+                    // 如果有映射规则，则使用映射后的规则
+                    if (!mappedRules.isEmpty()) {
+                        maskingRules = mappedRules;
+                        logger.debug("使用映射后的规则，数量: {}", maskingRules.size());
                     }
                 }
                 
-                // 如果成功创建了映射规则，则使用映射规则替换原始规则
-                if (!mappedRules.isEmpty()) {
-                    logger.debug("使用映射后的规则: {}条", mappedRules.size());
-                    maskingRules = mappedRules;
+                if (maskingRules.isEmpty()) {
+                    logger.warn("没有找到任何匹配的脱敏规则，将不会进行数据脱敏处理!");
                 } else {
-                    logger.debug("未创建任何映射规则，将使用原始规则");
+                    logger.debug("======== 最终使用的脱敏规则详情 ========");
+                    for (int i = 0; i < maskingRules.size(); i++) {
+                        Map<String, Object> rule = maskingRules.get(i);
+                        logger.debug("规则[{}]: {}", i, rule);
+                        logger.debug("  - id: {}", rule.get("id"));
+                        logger.debug("  - ruleId: {}", rule.get("ruleId"));
+                        logger.debug("  - name: {}", rule.get("name"));
+                        logger.debug("  - type: {}", rule.get("type"));
+                        logger.debug("  - pattern: {}", rule.get("pattern"));
+                        logger.debug("  - 列名: {}", staticDataMaskingService.extractColumnName(rule));
+                    }
+                    logger.debug("=======================================");
                 }
                 
-                logger.debug("===========================");
+                // 使用静态脱敏服务处理数据
+                logger.debug("获取脱敏处理后的数据...");
+                maskedData = staticDataMaskingService.processMaskedData(originalData, maskingRules);
+                logger.debug("成功获取脱敏后数据, 共 {} 条记录", maskedData.size());
             }
             
-            // 添加调试信息，检查最终用于处理的规则
-            if (maskingRules.isEmpty()) {
-                logger.warn("没有找到任何匹配的脱敏规则，将不会进行数据脱敏处理!");
-            } else {
-                logger.debug("======== 最终使用的脱敏规则详情 ========");
-                for (int i = 0; i < maskingRules.size(); i++) {
-                    Map<String, Object> rule = maskingRules.get(i);
-                    logger.debug("规则[{}]: {}", i, rule);
-                    logger.debug("  - id: {}", rule.get("id"));
-                    logger.debug("  - ruleId: {}", rule.get("ruleId"));
-                    logger.debug("  - name: {}", rule.get("name"));
-                    logger.debug("  - type: {}", rule.get("type"));
-                    logger.debug("  - pattern: {}", rule.get("pattern"));
-                    logger.debug("  - 列名: {}", staticDataMaskingService.extractColumnName(rule));
-                }
-                logger.debug("=======================================");
-            }
+            task.setExecutionLog(task.getExecutionLog() + "\n脱敏处理完成，准备输出数据");
+            taskRepository.save(task);
             
             // 获取输出配置
             String outputFormat = task.getOutputFormat();
@@ -534,26 +643,6 @@ public class TaskServiceImpl implements TaskService {
                 outputFormat, 
                 (outputFormat.equalsIgnoreCase("CSV") || outputFormat.equalsIgnoreCase("JSON") ? 
                 outputLocation : outputTable));
-            
-            // 解析数据源信息
-            String sourceDatabase = task.getSourceDatabase();
-            String sourceTables = task.getSourceTables();
-            logger.debug("数据源信息: 数据库={}, 表={}", sourceDatabase, sourceTables);
-            
-            // 记录开始处理
-            task.setExecutionLog("开始执行脱敏任务，处理表: " + sourceTables);
-            taskRepository.save(task);
-            
-            // 获取原始数据
-            List<Map<String, Object>> originalData = staticDataMaskingService.queryOriginalData(sourceDatabase, sourceTables);
-            
-            // 使用静态脱敏服务处理数据
-            logger.debug("获取脱敏处理后的数据...");
-            List<Map<String, Object>> maskedData = staticDataMaskingService.processMaskedData(originalData, maskingRules);
-            logger.debug("成功获取脱敏后数据, 共 {} 条记录", maskedData.size());
-            
-            task.setExecutionLog(task.getExecutionLog() + "\n脱敏处理完成，准备输出数据");
-            taskRepository.save(task);
             
             // 根据输出格式处理
             if ("CSV".equalsIgnoreCase(outputFormat)) {
@@ -729,7 +818,6 @@ public class TaskServiceImpl implements TaskService {
             logger.debug("任务名称: {}", task.getTaskName());
             logger.debug("原始数据量: {}", (originalData != null ? originalData.size() : 0));
             logger.debug("脱敏数据量: {}", (maskedData != null ? maskedData.size() : 0));
-            logger.debug("规则数量: {}", (maskingRules != null ? maskingRules.size() : 0));
             
             // 计算脱敏数据与原始数据的差异统计
             if (originalData != null && !originalData.isEmpty() && maskedData != null && !maskedData.isEmpty() && 
@@ -805,10 +893,49 @@ public class TaskServiceImpl implements TaskService {
             // 保存任务状态
             taskRepository.save(task);
         } catch (Exception e) {
-            logger.error("脱敏任务执行失败: {}, 任务ID: {}", e.getMessage(), task.getId(), e);
-            e.printStackTrace();
-            throw new RuntimeException("脱敏任务执行失败: " + e.getMessage(), e);
+            logger.error("脱敏任务执行失败: {}", e.getMessage());
+            task.setExecutionLog(task.getExecutionLog() + "\n脱敏任务执行失败: " + e.getMessage());
+            task.setStatus("失败");
+            task.setUpdateTime(LocalDateTime.now());
+            taskRepository.save(task);
+            
+            throw new RuntimeException("脱敏任务执行失败", e);
         }
+    }
+    
+    /**
+     * 使用Presidio处理数据的方法
+     * @param originalData 原始数据
+     * @return 脱敏后的数据
+     */
+    private List<Map<String, Object>> processMaskedDataWithPresidio(List<Map<String, Object>> originalData) {
+        logger.debug("开始使用Presidio处理数据，数据记录数: {}", originalData.size());
+        
+        List<Map<String, Object>> maskedData = new ArrayList<>();
+        
+        for (Map<String, Object> row : originalData) {
+            Map<String, Object> maskedRow = new HashMap<>(row);
+            
+            // 处理每一个字段
+            for (Map.Entry<String, Object> entry : row.entrySet()) {
+                String columnName = entry.getKey();
+                Object value = entry.getValue();
+                
+                // 只处理字符串类型数据
+                if (value instanceof String) {
+                    String stringValue = (String) value;
+                    
+                    // 使用Presidio处理字符串
+                    String maskedValue = presidioService.processText(stringValue);
+                    maskedRow.put(columnName, maskedValue);
+                }
+            }
+            
+            maskedData.add(maskedRow);
+        }
+        
+        logger.debug("Presidio处理完成，处理后数据记录数: {}", maskedData.size());
+        return maskedData;
     }
     
     // 处理任务执行异常

@@ -34,6 +34,15 @@ public class TaskDTO {
     private String outputDatabase; // 输出的数据库名，可为空表示同库
     private String outputTable; // 输出的表名，若与源表相同则为同库同表覆盖脱敏
     
+    // 使用Presidio进行脱敏
+    private Boolean usePresidio;
+    
+    // 自动识别敏感列
+    private Boolean autoDetectColumns;
+    
+    // 识别到的敏感列
+    private String detectedColumns;
+    
     // 执行计划
     private LocalDateTime planExecuteTime;
     
@@ -189,6 +198,30 @@ public class TaskDTO {
 
     public void setOutputTable(String outputTable) {
         this.outputTable = outputTable;
+    }
+
+    public Boolean getUsePresidio() {
+        return usePresidio;
+    }
+
+    public void setUsePresidio(Boolean usePresidio) {
+        this.usePresidio = usePresidio;
+    }
+
+    public Boolean getAutoDetectColumns() {
+        return autoDetectColumns;
+    }
+
+    public void setAutoDetectColumns(Boolean autoDetectColumns) {
+        this.autoDetectColumns = autoDetectColumns;
+    }
+
+    public String getDetectedColumns() {
+        return detectedColumns;
+    }
+
+    public void setDetectedColumns(String detectedColumns) {
+        this.detectedColumns = detectedColumns;
     }
 
     public LocalDateTime getPlanExecuteTime() {

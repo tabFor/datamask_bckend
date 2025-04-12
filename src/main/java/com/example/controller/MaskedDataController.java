@@ -2,6 +2,11 @@ package com.example.controller;
 
 import com.example.dto.ApiResponse;
 import com.example.service.DataMaskingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +21,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/masked-data")
+@Tag(name = "脱敏数据查询", description = "提供示例脱敏数据的查询接口，包括用户信息和订单信息的脱敏数据")
 public class MaskedDataController {
 
     @Autowired
@@ -26,6 +32,21 @@ public class MaskedDataController {
      * 
      * @return 脱敏后的用户数据列表
      */
+    @Operation(
+        summary = "获取脱敏后的用户数据", 
+        description = "返回脱敏处理后的用户数据示例，包括用户ID、用户名、邮箱、手机号和身份证号等信息，敏感字段已经按照预设规则进行了脱敏处理"
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200", 
+            description = "成功获取脱敏后的用户数据", 
+            content = @Content(schema = @Schema(implementation = ApiResponse.class))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "403", 
+            description = "权限不足，需要数据分析师或管理员权限"
+        )
+    })
     @GetMapping("/users")
     public ApiResponse<List<Map<String, Object>>> getMaskedUsers() {
         // 模拟从数据库获取的原始数据
@@ -109,6 +130,21 @@ public class MaskedDataController {
      * 
      * @return 脱敏后的订单数据列表
      */
+    @Operation(
+        summary = "获取脱敏后的订单数据", 
+        description = "返回脱敏处理后的订单数据示例，包括订单ID、订单号、收货人信息、创建时间和订单金额等，敏感字段如收货人姓名、联系电话和地址已按照预设规则脱敏"
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200", 
+            description = "成功获取脱敏后的订单数据", 
+            content = @Content(schema = @Schema(implementation = ApiResponse.class))
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "403", 
+            description = "权限不足，需要数据分析师或管理员权限"
+        )
+    })
     @GetMapping("/orders")
     public ApiResponse<List<Map<String, Object>>> getMaskedOrders() {
         // 模拟从数据库获取的原始数据

@@ -2,6 +2,13 @@ package com.example.controller;
 
 import com.example.model.AuditLog;
 import com.example.service.AuditLogService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -14,6 +21,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/audit-logs")
+@Tag(name = "审计日志管理", description = "提供系统操作审计日志的查询和搜索功能，支持按时间和操作类型筛选")
 public class AuditLogController {
 
     // 定义不需要记录的操作列表
@@ -84,12 +92,36 @@ public class AuditLogController {
     @Autowired
     private AuditLogService auditLogService;
 
+    @Operation(
+        summary = "搜索审计日志", 
+        description = "根据时间范围和操作类型搜索系统审计日志，支持分页查询。可用于安全审计、用户操作追踪和系统问题排查。"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "成功获取审计日志", 
+            content = @Content(schema = @Schema(implementation = Page.class))
+        ),
+        @ApiResponse(
+            responseCode = "403", 
+            description = "权限不足，仅管理员可访问"
+        )
+    })
     @GetMapping("/search")
     public ResponseEntity<Page<AuditLog>> searchLogs(
+            @Parameter(description = "开始时间（ISO格式）") 
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            
+            @Parameter(description = "结束时间（ISO格式）") 
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
+            
+            @Parameter(description = "操作类型列表，支持多选") 
             @RequestParam(required = false) List<String> operations,
+            
+            @Parameter(description = "页码，从1开始") 
             @RequestParam(defaultValue = "1") int page,
+            
+            @Parameter(description = "每页记录数") 
             @RequestParam(defaultValue = "10") int size) {
         
         Page<AuditLog> logs = auditLogService.searchLogs(startTime, endTime, operations, page, size);
