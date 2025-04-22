@@ -1,0 +1,50 @@
+# 编译输出
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# 日志文件
+logs/
+*.log
+
+# 本地配置文件
+application-local.properties
+application-dev.properties
+application-test.properties
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.settings/
+.classpath
+.project
+.factorypath
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# 其他
+*.bak
+*.swp
+*.swo
