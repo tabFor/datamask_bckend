@@ -27,18 +27,20 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(authz -> authz
                         // 公开接口 - 无需认证
-                        .requestMatchers("/api/login").permitAll()  // 登录接口允许匿名访问
+                        .requestMatchers("/api/login").permitAll() // 登录接口允许匿名访问
                         .requestMatchers("/api/check-auth", "/api/check-login").permitAll() // 验证登录状态接口允许匿名访问
                         .requestMatchers("/api/test-data/**").permitAll() // 测试数据接口允许匿名访问
                         .requestMatchers("/api/masking-rules/active").permitAll() // 脱敏规则接口允许匿名访问
-                        
+                        .requestMatchers("/api/presidio/**").permitAll() // Presidio 相关接口允许匿名访问
+
                         // Swagger 相关路径允许匿名访问
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/swagger-ui/index.html").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
-                        
+                        .requestMatchers("/v3/api-docs/**", "/api-docs/**", "/swagger-resources/**", "/webjars/**")
+                        .permitAll()
+
                         // 明确允许任何认证用户访问的接口
                         .requestMatchers("/api/dynamic/masking/**").authenticated() // 动态脱敏接口允许任何已认证用户访问
-                        
+
                         // 其他所有请求需要认证
                         .anyRequest().authenticated())
                 .csrf(csrf -> csrf.disable())
@@ -47,7 +49,7 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class); // 添加JWT过滤器
         return http.build();
     }
-    
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -57,17 +59,17 @@ public class SecurityConfig {
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
-    
+
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
         return new JwtAuthenticationFilter();
     }
-    
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
